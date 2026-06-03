@@ -58,6 +58,7 @@ export default async function Home() {
           text={s?.draft_standby_text ?? "Standby for your draft picks."}
           myTeams={myTeams}
           draftLocked={s?.draft_locked ?? false}
+          isAdmin={admin}
         />
       );
     }

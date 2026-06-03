@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 interface DraftedTeam {
   teamName: string;
   fifaCode: string;
@@ -7,16 +9,28 @@ export function StandbyView({
   text,
   myTeams,
   draftLocked,
+  isAdmin,
 }: {
   text: string;
   myTeams: DraftedTeam[];
   draftLocked: boolean;
+  isAdmin?: boolean;
 }) {
   return (
     <div className="min-h-screen pb-24 flex flex-col">
-      <header className="px-4 pt-5 pb-3">
-        <p className="text-xs text-paper/50 uppercase tracking-widest">WC26 Pool</p>
-        <h1 className="text-lg font-bold text-gold mt-1">Draft Standby</h1>
+      <header className="px-4 pt-5 pb-3 flex items-start justify-between">
+        <div>
+          <p className="text-xs text-paper/50 uppercase tracking-widest">WC26 Pool</p>
+          <h1 className="text-lg font-bold text-gold mt-1">Draft Standby</h1>
+        </div>
+        {isAdmin && (
+          <Link
+            href="/admin"
+            className="text-xs text-paper/40 hover:text-paper border border-paper/20 rounded-lg px-3 py-1.5"
+          >
+            Admin
+          </Link>
+        )}
       </header>
 
       {/* Organiser message */}

@@ -67,7 +67,7 @@ export function PredictionClient({ grouped, teamNames, predMap, deadline, isLock
   const matches = grouped[selectedGroup] ?? [];
 
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="min-h-screen flex flex-col pb-24">
       {/* Header */}
       <header className="px-4 pt-5 pb-3 space-y-3">
         <h1 className="text-lg font-bold text-gold">Group Predictions</h1>
