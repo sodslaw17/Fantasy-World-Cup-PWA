@@ -1,0 +1,34 @@
+@import "tailwindcss";
+
+/* FIFA World Cup 2026 design tokens — adjust hex values here to retheme */
+@theme {
+  /* Core palette */
+  --color-gold: #C8A24B;
+  --color-gold-light: #E0C278;
+  --color-gold-dark: #A07830;
+  --color-ink: #0B0B0B;
+  --color-ink-soft: #1A1A1A;
+  --color-paper: #FFFFFF;
+
+  /* Tri-host accent colours */
+  --color-accent-red: #E4002B;
+  --color-accent-blue: #0A3D91;
+  --color-accent-green: #008A52;
+
+  /* Tap-target baseline: 48px minimum for mobile */
+  --spacing-tap: 48px;
+
+  --font-sans: system-ui, -apple-system, sans-serif;
+}
+
+/* Base dark-mode body */
+html {
+  background-color: theme(--color-ink);
+  color: theme(--color-paper);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Ensure safe-area padding on notched devices */
+body {
+  padding-bottom: env(safe-area-inset-bottom);
+}
