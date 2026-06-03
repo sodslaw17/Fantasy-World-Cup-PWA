@@ -49,6 +49,13 @@ export default async function Home() {
         in the next phase.
       </p>
 
+      <Link
+        href="/predict"
+        className="w-full max-w-sm rounded-xl bg-gold text-ink font-bold text-center py-4 text-lg active:scale-95 transition-transform"
+      >
+        Enter predictions →
+      </Link>
+
       {admin && (
         <Link
           href="/admin"
