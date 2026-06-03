@@ -1,6 +1,13 @@
 import { redirect } from "next/navigation";
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { isAdmin } from "@/lib/auth/roles";
+
+const NAV = [
+  { href: "/admin",        label: "Dashboard" },
+  { href: "/admin/users",  label: "Players"   },
+  { href: "/admin/import", label: "Import"    },
+];
 
 export default async function AdminLayout({
   children,
@@ -12,18 +19,34 @@ export default async function AdminLayout({
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (!user || !isAdmin(user.email!)) {
-    redirect("/");
-  }
+  if (!user || !isAdmin(user.email!)) redirect("/");
 
   return (
-    <div className="min-h-screen">
-      <header className="border-b border-paper/10 px-4 py-3 flex items-center gap-2">
-        <span className="text-gold font-bold">WC26</span>
-        <span className="text-paper/40">·</span>
-        <span className="text-sm text-paper/70">Admin</span>
+    <div className="min-h-screen flex flex-col">
+      <header className="border-b border-paper/10 px-4 py-3 flex items-center gap-4 bg-ink-soft">
+        <Link href="/admin" className="text-gold font-bold text-sm shrink-0">
+          WC26 Admin
+        </Link>
+        <nav className="flex gap-1 overflow-x-auto">
+          {NAV.map(({ href, label }) => (
+            <Link
+              key={href}
+              href={href}
+              className="text-xs px-3 py-2 rounded-lg text-paper/60 hover:text-paper hover:bg-paper/5 whitespace-nowrap min-h-tap flex items-center"
+            >
+              {label}
+            </Link>
+          ))}
+        </nav>
+        <Link
+          href="/"
+          className="ml-auto text-xs text-paper/40 hover:text-paper shrink-0"
+        >
+          ← App
+        </Link>
       </header>
-      {children}
+
+      <div className="flex-1">{children}</div>
     </div>
   );
 }
