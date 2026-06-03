@@ -7,6 +7,7 @@ const NAV = [
   { href: "/",        label: "Standings", icon: "🏆" },
   { href: "/today",   label: "Today",     icon: "📅" },
   { href: "/predict", label: "Predict",   icon: "⚽" },
+  { href: "/payouts", label: "Payouts",   icon: "💰" },
 ];
 
 export function BottomNav() {
