@@ -4,11 +4,12 @@ import { createClient } from "@/lib/supabase/server";
 import { isAdmin } from "@/lib/auth/roles";
 
 const NAV = [
-  { href: "/admin",          label: "Dashboard" },
-  { href: "/admin/users",    label: "Players"   },
-  { href: "/admin/import",   label: "Import"    },
-  { href: "/admin/draft",    label: "Draft"     },
-  { href: "/admin/settings", label: "Settings"  },
+  { href: "/admin",           label: "Dashboard" },
+  { href: "/admin/users",     label: "Players"   },
+  { href: "/admin/import",    label: "Import"    },
+  { href: "/admin/results",   label: "Results"   },
+  { href: "/admin/draft",     label: "Draft"     },
+  { href: "/admin/settings",  label: "Settings"  },
 ];
 
 export default async function AdminLayout({
