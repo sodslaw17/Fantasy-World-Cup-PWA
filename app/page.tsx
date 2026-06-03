@@ -1,69 +1,84 @@
-import { createClient } from "@/lib/supabase/server";
-import { isAdmin, isSuperAdmin } from "@/lib/auth/roles";
+import { redirect } from "next/navigation";
 import Link from "next/link";
+import { createClient } from "@/lib/supabase/server";
+import { createServiceClient } from "@/lib/supabase/service";
+import { computeLeaderboard } from "@/lib/scoring/leaderboard";
+import { LeaderboardTable } from "@/components/standings/LeaderboardTable";
+import { MyStatsCard } from "@/components/standings/MyStatsCard";
+import { isAdmin } from "@/lib/auth/roles";
+import type { Profile } from "@/lib/db";
+
+export const metadata = { title: "Standings — WC26 Pool" };
 
 export default async function Home() {
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
+  if (!user) redirect("/login");
 
-  const email = user?.email ?? "";
-  const admin = isAdmin(email);
-  const superAdmin = isSuperAdmin(email);
+  const service = createServiceClient();
+
+  const [{ data: profiles }, { data: matches }, { data: predictions }] =
+    await Promise.all([
+      service.from("profiles").select("id, display_name, auth_id"),
+      service
+        .from("matches")
+        .select("id, home_goals, away_goals, status")
+        .eq("stage", "group"),
+      service
+        .from("predictions")
+        .select("user_id, match_id, home_goals_pred, away_goals_pred"),
+    ]);
+
+  const leaderboard = computeLeaderboard(
+    profiles ?? [],
+    matches ?? [],
+    predictions ?? []
+  );
+
+  const totalMatches = (matches ?? []).length;
+  const finishedMatches = (matches ?? []).filter(
+    (m) => m.status === "finished"
+  ).length;
+
+  const me = leaderboard.find((e) => e.authId === user.id);
+  const leader = leaderboard[0];
+  const admin = isAdmin(user.email ?? "");
 
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center px-5 py-12 gap-6">
-      {/* Wordmark */}
-      <div className="text-center">
-        <div className="text-5xl font-black tracking-tight">
-          <span className="text-gold">WC</span>
-          <span className="text-paper">26</span>
+    <div className="min-h-screen pb-24">
+      <header className="px-4 pt-5 pb-3 flex items-center justify-between">
+        <div>
+          <h1 className="text-lg font-bold text-gold">Standings</h1>
+          <p className="text-xs text-paper/40">
+            {finishedMatches} / {totalMatches} matches played
+          </p>
         </div>
-        <p className="text-xs text-paper/50 uppercase tracking-widest mt-1">
-          Fantasy Pool
-        </p>
-      </div>
-
-      {/* Auth confirmation */}
-      <div className="w-full max-w-sm rounded-xl bg-ink-soft border border-paper/10 p-5 space-y-3">
-        <div className="flex items-center gap-2">
-          <span className="w-2 h-2 rounded-full bg-accent-green" />
-          <span className="text-sm text-paper/70">Signed in</span>
-        </div>
-        <p className="text-sm font-medium truncate">{email}</p>
         {admin && (
-          <span className="inline-block text-xs px-2 py-0.5 rounded bg-accent-blue/20 text-accent-blue border border-accent-blue/30">
+          <Link
+            href="/admin"
+            className="text-xs text-paper/40 hover:text-paper border border-paper/20 rounded-lg px-3 py-1.5"
+          >
             Admin
-          </span>
+          </Link>
         )}
-        {superAdmin && (
-          <span className="inline-block text-xs px-2 py-0.5 rounded bg-accent-red/20 text-accent-red border border-accent-red/30 ml-1">
-            Super Admin
-          </span>
-        )}
+      </header>
+
+      <MyStatsCard
+        me={me}
+        leader={leader}
+        totalPlayers={leaderboard.length}
+      />
+
+      <div className="px-4">
+        <LeaderboardTable
+          entries={leaderboard}
+          currentAuthId={user.id}
+          totalMatches={totalMatches}
+          finishedMatches={finishedMatches}
+        />
       </div>
-
-      <p className="text-xs text-paper/30 text-center max-w-xs">
-        Phase 0 scaffold — auth working. Prediction UI and leaderboards coming
-        in the next phase.
-      </p>
-
-      <Link
-        href="/predict"
-        className="w-full max-w-sm rounded-xl bg-gold text-ink font-bold text-center py-4 text-lg active:scale-95 transition-transform"
-      >
-        Enter predictions →
-      </Link>
-
-      {admin && (
-        <Link
-          href="/admin"
-          className="text-sm text-gold underline underline-offset-4"
-        >
-          Go to Admin →
-        </Link>
-      )}
-    </main>
+    </div>
   );
 }
