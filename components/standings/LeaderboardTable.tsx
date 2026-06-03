@@ -68,11 +68,6 @@ export function LeaderboardTable({
                 {entry.points}
                 <span className="text-xs font-normal text-paper/40 ml-0.5">pts</span>
               </p>
-              {finishedMatches > 0 && (
-                <p className="text-xs text-paper/40 tabular-nums">
-                  ∑{entry.predictedGoals} pred
-                </p>
-              )}
             </div>
           </div>
         );
