@@ -96,4 +96,7 @@ export interface Settings {
   prediction_deadline_utc: string;
   draft_standby_text: string;
   current_phase_override: string | null;
+  group_end_utc: string | null;
+  knockout_start_utc: string | null;
+  draft_locked: boolean;
 }
