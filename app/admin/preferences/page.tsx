@@ -12,8 +12,9 @@ export default async function AdminPreferencesPage() {
     service.from("teams").select("fifa_code, name"),
   ]);
 
-  const teamName = (code: string) =>
-    (teams ?? []).find((t) => t.fifa_code === code)?.name ?? code;
+  const teamNames: Record<string, string> = Object.fromEntries(
+    (teams ?? []).map((t) => [t.fifa_code, t.name])
+  );
 
   const prefByProfile: Record<string, (typeof prefs extends (infer T)[] | null ? T : never)> =
     Object.fromEntries((prefs ?? []).map((p) => [p.profile_id, p]));
@@ -31,7 +32,7 @@ export default async function AdminPreferencesPage() {
             key={profile.id}
             displayName={profile.display_name}
             pref={prefByProfile[profile.id] ?? null}
-            teamName={teamName}
+            teamNames={teamNames}
           />
         ))}
       </div>

@@ -14,11 +14,11 @@ interface Pref {
 export function PreferenceAccordion({
   displayName,
   pref,
-  teamName,
+  teamNames,
 }: {
   displayName: string;
   pref: Pref | null;
-  teamName: (code: string) => string;
+  teamNames: Record<string, string>;
 }) {
   const [open, setOpen] = useState(false);
 
@@ -82,7 +82,7 @@ export function PreferenceAccordion({
                       <li key={code} className="text-xs">
                         <span className="text-paper/40 font-mono w-6 inline-block">{i + 1}.</span>
                         <span className="font-mono text-paper/50 mr-1.5">{code}</span>
-                        {teamName(code)}
+                        {teamNames[code] ?? code}
                       </li>
                     ))}
                   </ol>
