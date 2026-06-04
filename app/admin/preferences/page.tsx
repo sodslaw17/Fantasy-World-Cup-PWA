@@ -40,11 +40,22 @@ export default async function AdminPreferencesPage() {
                   <div className="flex gap-4">
                     <div>
                       <p className="text-xs text-paper/50">Preferred position</p>
-                      <p className="font-medium">
-                        {pref.preferred_position
-                          ? `Position ${pref.preferred_position} — picks ${SNAKE_PICKS[pref.preferred_position]?.join(", ")}`
-                          : "No preference"}
-                      </p>
+                      {pref.position_preferences?.length ? (
+                        <ol className="space-y-0.5 mt-1">
+                          {pref.position_preferences.map((n: number, i: number) => (
+                            <li key={n} className="text-xs font-mono">
+                              <span className="text-paper/40">{i + 1}. </span>
+                              Position {n} — picks {SNAKE_PICKS[n]?.join(", ")}
+                            </li>
+                          ))}
+                        </ol>
+                      ) : (
+                        <p className="font-medium">
+                          {pref.preferred_position
+                            ? `Position ${pref.preferred_position} — picks ${SNAKE_PICKS[pref.preferred_position]?.join(", ")}`
+                            : "No preference"}
+                        </p>
+                      )}
                     </div>
                   </div>
 

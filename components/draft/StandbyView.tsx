@@ -3,6 +3,19 @@ import { Avatar } from "@/components/ui/Avatar";
 import { SNAKE_PICKS } from "@/lib/draft";
 import type { LeaderboardEntry } from "@/lib/scoring/leaderboard";
 
+function formatPositionPref(pref: { preferred_position: number | null; position_preferences?: number[] | null }): string | null {
+  if (pref.position_preferences?.length) {
+    return pref.position_preferences
+      .slice(0, 3)
+      .map((n) => `#${n} (picks ${SNAKE_PICKS[n]?.join(", ")})`)
+      .join(" → ");
+  }
+  if (pref.preferred_position) {
+    return `#${pref.preferred_position} — picks ${SNAKE_PICKS[pref.preferred_position]?.join(", ")}`;
+  }
+  return null;
+}
+
 interface DraftedTeam {
   teamName: string;
   fifaCode: string;
@@ -12,6 +25,7 @@ interface StandbyEntry extends LeaderboardEntry {
   avatarUrl?: { avatar_url: string | null } | undefined;
   pref: {
     preferred_position: number | null;
+    position_preferences?: number[] | null;
     team_wishlist: string[] | null;
     notes: string | null;
   } | null;
@@ -145,19 +159,13 @@ export function StandbyView({
 
                 {e.pref ? (
                   <div className="space-y-1.5 pl-9">
-                    {e.pref.preferred_position && (
-                      <p className="text-xs text-paper/70">
-                        <span className="text-paper/40">Preferred position: </span>
-                        <span className="font-semibold text-gold">
-                          #{e.pref.preferred_position}
-                        </span>
-                        <span className="text-paper/40 ml-1">
-                          — picks{" "}
-                          <span className="font-mono text-paper/60">
-                            {SNAKE_PICKS[e.pref.preferred_position]?.join(", ")}
-                          </span>
-                        </span>
-                      </p>
+                    {formatPositionPref(e.pref) && (
+                      <div>
+                        <p className="text-xs text-paper/40 mb-0.5">Position preference (top 3)</p>
+                        <p className="text-xs text-paper/70 font-mono">
+                          {formatPositionPref(e.pref)}
+                        </p>
+                      </div>
                     )}
                     {e.pref.team_wishlist && e.pref.team_wishlist.length > 0 && (
                       <div>
