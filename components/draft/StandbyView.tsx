@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Avatar } from "@/components/ui/Avatar";
+import { SNAKE_PICKS } from "@/lib/draft";
 import type { LeaderboardEntry } from "@/lib/scoring/leaderboard";
 
 interface DraftedTeam {
@@ -147,7 +148,15 @@ export function StandbyView({
                     {e.pref.preferred_position && (
                       <p className="text-xs text-paper/70">
                         <span className="text-paper/40">Preferred position: </span>
-                        <span className="font-semibold text-gold">#{e.pref.preferred_position}</span>
+                        <span className="font-semibold text-gold">
+                          #{e.pref.preferred_position}
+                        </span>
+                        <span className="text-paper/40 ml-1">
+                          — picks{" "}
+                          <span className="font-mono text-paper/60">
+                            {SNAKE_PICKS[e.pref.preferred_position]?.join(", ")}
+                          </span>
+                        </span>
                       </p>
                     )}
                     {e.pref.team_wishlist && e.pref.team_wishlist.length > 0 && (

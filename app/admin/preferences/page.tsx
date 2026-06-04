@@ -1,4 +1,5 @@
 import { createServiceClient } from "@/lib/supabase/service";
+import { SNAKE_PICKS } from "@/lib/draft";
 
 export const metadata = { title: "Draft Preferences — WC26 Admin" };
 
@@ -40,7 +41,9 @@ export default async function AdminPreferencesPage() {
                     <div>
                       <p className="text-xs text-paper/50">Preferred position</p>
                       <p className="font-medium">
-                        {pref.preferred_position ? `Position ${pref.preferred_position}` : "No preference"}
+                        {pref.preferred_position
+                          ? `Position ${pref.preferred_position} — picks ${SNAKE_PICKS[pref.preferred_position]?.join(", ")}`
+                          : "No preference"}
                       </p>
                     </div>
                   </div>

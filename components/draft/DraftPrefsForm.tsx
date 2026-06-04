@@ -2,6 +2,7 @@
 
 import { useActionState, useState } from "react";
 import { saveDraftPreferences } from "@/app/my-picks/actions";
+import { SNAKE_PICKS } from "@/lib/draft";
 
 const initState = { error: undefined as string | undefined, success: false };
 
@@ -52,7 +53,9 @@ export function DraftPrefsForm({ teams, existing }: { teams: Team[]; existing: P
           className="w-full rounded-lg bg-ink border border-paper/20 px-3 py-2.5 text-sm text-paper focus:outline-none focus:ring-1 focus:ring-gold min-h-tap">
           <option value="">— no preference —</option>
           {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => (
-            <option key={n} value={n}>Position {n}</option>
+            <option key={n} value={n}>
+              Position {n} — picks {SNAKE_PICKS[n].join(", ")}
+            </option>
           ))}
         </select>
         <p className="text-xs text-paper/40">
