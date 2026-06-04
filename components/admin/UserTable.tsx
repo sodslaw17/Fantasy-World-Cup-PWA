@@ -1,7 +1,8 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import { addUser, updateDisplayName, deleteUser } from "@/app/admin/users/actions";
+import { addUser, updateDisplayName, updateAvatar, deleteUser } from "@/app/admin/users/actions";
+import { Avatar } from "@/components/ui/Avatar";
 import type { Profile } from "@/lib/db";
 
 const initialAddState = { error: undefined as string | undefined, success: false };
@@ -75,6 +76,9 @@ function PlayerRow({ profile }: { profile: Profile }) {
   const [editing, setEditing] = useState(false);
   const [editName, setEditName] = useState(profile.display_name);
   const [editError, setEditError] = useState<string>();
+  const [editingAvatar, setEditingAvatar] = useState(false);
+  const [avatarUrl, setAvatarUrl] = useState(profile.avatar_url ?? "");
+  const [avatarMsg, setAvatarMsg] = useState<string>();
   const [deleting, setDeleting] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState(false);
 
@@ -88,6 +92,13 @@ function PlayerRow({ profile }: { profile: Profile }) {
     }
   }
 
+  async function handleSaveAvatar() {
+    const result = await updateAvatar(profile.id, avatarUrl);
+    setAvatarMsg(result.error ?? "Saved");
+    if (!result.error) setEditingAvatar(false);
+    setTimeout(() => setAvatarMsg(undefined), 3000);
+  }
+
   async function handleDelete() {
     if (!deleteConfirm) {
       setDeleteConfirm(true);
@@ -99,6 +110,14 @@ function PlayerRow({ profile }: { profile: Profile }) {
 
   return (
     <li className="p-4 flex items-start gap-3">
+      {/* Avatar */}
+      <div className="shrink-0 flex flex-col items-center gap-1">
+        <Avatar name={profile.display_name} url={profile.avatar_url} size="md" />
+        <button onClick={() => setEditingAvatar(!editingAvatar)}
+          className="text-xs text-paper/30 hover:text-gold">
+          {editingAvatar ? "cancel" : "photo"}
+        </button>
+      </div>
       {/* Status dot */}
       <span
         className={`mt-1 w-2 h-2 rounded-full flex-shrink-0 ${
@@ -134,6 +153,22 @@ function PlayerRow({ profile }: { profile: Profile }) {
         )}
         {editError && <p className="text-xs text-accent-red mt-1">{editError}</p>}
         <p className="text-xs text-paper/50 mt-0.5 truncate">{profile.email}</p>
+        {editingAvatar && (
+          <div className="flex gap-2 mt-2">
+            <input value={avatarUrl} onChange={(e) => setAvatarUrl(e.target.value)}
+              placeholder="https://… (photo URL)"
+              className="flex-1 rounded bg-ink border border-paper/20 px-2 py-1 text-xs text-paper focus:outline-none focus:ring-1 focus:ring-gold" />
+            <button onClick={handleSaveAvatar}
+              className="text-xs text-gold font-medium px-2 py-1 rounded hover:bg-gold/10">
+              Save
+            </button>
+          </div>
+        )}
+        {avatarMsg && (
+          <p className={`text-xs mt-1 ${avatarMsg === "Saved" ? "text-accent-green" : "text-accent-red"}`}>
+            {avatarMsg}
+          </p>
+        )}
       </div>
 
       <div className="flex gap-2 flex-shrink-0">

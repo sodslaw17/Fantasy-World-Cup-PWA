@@ -7,9 +7,11 @@ import { computeLeaderboard } from "@/lib/scoring/leaderboard";
 import { computeOverallLeaderboard } from "@/lib/scoring/overall";
 import { LeaderboardTable } from "@/components/standings/LeaderboardTable";
 import { MyStatsCard } from "@/components/standings/MyStatsCard";
+import { EfficiencyLeaderboard } from "@/components/standings/EfficiencyLeaderboard";
 import { StandbyView } from "@/components/draft/StandbyView";
 import { KnockoutHome } from "@/components/knockout/KnockoutHome";
 import { isAdmin } from "@/lib/auth/roles";
+import { computeEfficiencyLeaderboard } from "@/lib/scoring/sidepots";
 import type { Settings, Match } from "@/lib/db";
 import type { KnockoutMatch } from "@/lib/scoring/knockout";
 
@@ -23,12 +25,13 @@ export default async function Home() {
   const service = createServiceClient();
   const admin = isAdmin(user.email ?? "");
 
-  const [{ data: settings }, { data: profiles }, { data: allMatches }, { data: predictions }] =
+  const [{ data: settings }, { data: profiles }, { data: allMatches }, { data: predictions }, { data: effPicks }] =
     await Promise.all([
       service.from("settings").select("*").single(),
-      service.from("profiles").select("id, display_name, auth_id"),
+      service.from("profiles").select("id, display_name, auth_id, avatar_url"),
       service.from("matches").select("*").order("kickoff_utc"),
       service.from("predictions").select("user_id, match_id, home_goals_pred, away_goals_pred"),
+      service.from("efficiency_picks").select("*"),
     ]);
 
   const s = settings as Settings | null;
@@ -182,6 +185,34 @@ export default async function Home() {
   const me = leaderboard.find((e) => e.authId === user.id);
   const leader = leaderboard[0];
 
+  // Build profile avatar map
+  const avatarByAuthId: Record<string, string | null> = Object.fromEntries(
+    (profiles ?? []).map((p: { auth_id: string | null; avatar_url: string | null }) => [p.auth_id, p.avatar_url])
+  );
+
+  // Efficiency leaderboard data
+  const effEntries = computeEfficiencyLeaderboard(
+    (effPicks ?? []).map((p) => {
+      const prof = (profiles ?? []).find((pr: { id: string }) => pr.id === p.profile_id);
+      return {
+        profileId: p.profile_id,
+        displayName: (prof as { display_name?: string } | undefined)?.display_name ?? "Unknown",
+        playerName: p.player_name,
+        teamCode: p.team_code,
+        goals: p.goals,
+        assists: p.assists,
+        minutes: p.minutes,
+      };
+    })
+  ).map((e) => {
+    const prof = (profiles ?? []).find((pr: { id: string }) => pr.id === e.profileId) as { auth_id: string | null; avatar_url: string | null } | undefined;
+    return {
+      ...e,
+      userAvatarUrl: prof?.avatar_url ?? null,
+      playerPhotoUrl: (effPicks ?? []).find((ep) => ep.profile_id === e.profileId)?.player_photo_url ?? null,
+    };
+  });
+
   return (
     <div className="min-h-screen pb-24">
       <header className="px-4 pt-5 pb-3 flex items-center justify-between">
@@ -207,13 +238,21 @@ export default async function Home() {
       )}
 
       <MyStatsCard me={me} leader={leader} totalPlayers={leaderboard.length} />
-      <div className="px-4">
+      <div className="px-4 space-y-2">
         <LeaderboardTable
           entries={leaderboard}
           currentAuthId={user.id}
           totalMatches={totalMatches}
           finishedMatches={finishedMatches}
         />
+        {effEntries.length > 0 && (
+          <EfficiencyLeaderboard entries={effEntries} />
+        )}
+        <div className="pt-2">
+          <Link href="/payouts" className="text-xs text-paper/40 underline underline-offset-2">
+            View full payouts summary →
+          </Link>
+        </div>
       </div>
     </div>
   );

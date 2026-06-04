@@ -11,17 +11,18 @@ export async function saveEfficiencyPick(
   profileId: string,
   formData: FormData
 ): Promise<ActionResult> {
-  const playerName = (formData.get("player_name") as string)?.trim();
-  const teamCode   = (formData.get("team_code") as string)?.trim().toUpperCase() || null;
-  const goals      = parseInt(formData.get("goals") as string) || 0;
-  const assists    = parseInt(formData.get("assists") as string) || 0;
-  const minutes    = parseInt(formData.get("minutes") as string) || 0;
+  const playerName    = (formData.get("player_name") as string)?.trim();
+  const teamCode      = (formData.get("team_code") as string)?.trim().toUpperCase() || null;
+  const playerPhotoUrl = (formData.get("player_photo_url") as string)?.trim() || null;
+  const goals         = parseInt(formData.get("goals") as string) || 0;
+  const assists       = parseInt(formData.get("assists") as string) || 0;
+  const minutes       = parseInt(formData.get("minutes") as string) || 0;
 
   if (!playerName) return { error: "Player name required." };
 
   const service = createServiceClient();
   const { error } = await service.from("efficiency_picks").upsert(
-    { profile_id: profileId, player_name: playerName, team_code: teamCode, goals, assists, minutes },
+    { profile_id: profileId, player_name: playerName, team_code: teamCode, player_photo_url: playerPhotoUrl, goals, assists, minutes },
     { onConflict: "profile_id" }
   );
 

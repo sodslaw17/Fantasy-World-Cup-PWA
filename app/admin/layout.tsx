@@ -9,8 +9,9 @@ const NAV = [
   { href: "/admin/import",    label: "Import"    },
   { href: "/admin/results",   label: "Results"   },
   { href: "/admin/draft",     label: "Draft"     },
-  { href: "/admin/sidepots",  label: "Side Pots" },
-  { href: "/admin/settings",  label: "Settings"  },
+  { href: "/admin/sidepots",     label: "Side Pots"    },
+  { href: "/admin/preferences",  label: "Draft Prefs"  },
+  { href: "/admin/settings",     label: "Settings"     },
 ];
 
 export default async function AdminLayout({

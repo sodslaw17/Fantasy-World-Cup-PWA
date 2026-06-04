@@ -100,6 +100,10 @@ export function MatchResultForm({ match, homeTeam, awayTeam }: {
       )}
 
       {state.error && <p className="text-xs text-accent-red">{state.error}</p>}
+      {/* Note: card entry for this match is in Admin → Side Pots → Cards */}
+      <p className="text-xs text-paper/30 text-center">
+        Enter cards in <span className="font-medium">Admin → Side Pots → Cards</span>
+      </p>
 
       <button
         type="submit" disabled={pending}

@@ -48,6 +48,24 @@ export async function updateDisplayName(
   return { success: true };
 }
 
+export async function updateAvatar(
+  profileId: string,
+  avatarUrl: string
+): Promise<ActionResult> {
+  const url = avatarUrl.trim() || null;
+  const service = createServiceClient();
+  const { error } = await service
+    .from("profiles")
+    .update({ avatar_url: url })
+    .eq("id", profileId);
+
+  if (error) return { error: error.message };
+
+  revalidatePath("/admin/users");
+  revalidatePath("/");
+  return { success: true };
+}
+
 export async function deleteUser(profileId: string): Promise<ActionResult> {
   const service = createServiceClient();
 

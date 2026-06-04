@@ -20,7 +20,7 @@ export default async function SidePotsPage() {
   ] = await Promise.all([
     service.from("profiles").select("id, display_name").order("display_name"),
     service.from("efficiency_picks").select("*"),
-    service.from("matches").select("*").neq("stage", "group").order("kickoff_utc"),
+    service.from("matches").select("*").order("kickoff_utc"),
     service.from("match_stats").select("*"),
     service.from("penalty_events").select("*"),
     service.from("teams").select("fifa_code, name"),

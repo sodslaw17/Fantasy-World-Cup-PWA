@@ -12,7 +12,7 @@ interface MatchWithStats extends Match {
 }
 
 const STAGE_LABELS: Record<string, string> = {
-  r32: "Round of 32", r16: "Round of 16", qf: "Quarter-Finals",
+  group: "Group Stage", r32: "Round of 32", r16: "Round of 16", qf: "Quarter-Finals",
   sf: "Semi-Finals", bronze: "Bronze Final", final: "Final",
 };
 
@@ -38,7 +38,7 @@ export function CardsManager({ matches }: { matches: MatchWithStats[] }) {
   if (byStage.length === 0) {
     return (
       <p className="text-sm text-paper/40 py-6 text-center">
-        No finished knockout matches yet. Enter results first.
+        No finished matches yet. Enter results first.
       </p>
     );
   }

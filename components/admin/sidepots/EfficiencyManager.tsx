@@ -60,6 +60,9 @@ export function EfficiencyManager({ players }: { players: Player[] }) {
                   defaultValue={p?.teamCode ?? ""}
                   className="w-24 rounded-lg bg-ink border border-paper/20 px-3 py-2 text-sm font-mono text-paper placeholder:text-paper/30 focus:outline-none focus:ring-1 focus:ring-gold" />
               </div>
+              <input name="player_photo_url" type="text" placeholder="Footballer photo URL (optional)"
+                defaultValue={(player as { pick: { playerPhotoUrl?: string } | null }).pick?.playerPhotoUrl ?? ""}
+                className="w-full rounded-lg bg-ink border border-paper/20 px-3 py-2 text-sm text-paper placeholder:text-paper/30 focus:outline-none focus:ring-1 focus:ring-gold" />
               <div className="flex gap-2">
                 {[
                   { name: "goals",   label: "Goals",   val: p?.goals   ?? 0 },

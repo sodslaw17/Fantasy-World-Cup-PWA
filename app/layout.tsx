@@ -1,7 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { ServiceWorkerRegistrar } from "@/components/pwa/ServiceWorkerRegistrar";
-import { BottomNav } from "@/components/nav/BottomNav";
+import { NavWrapper } from "@/components/nav/NavWrapper";
 
 export const metadata: Metadata = {
   title: "WC26 Pool",
@@ -35,7 +35,7 @@ export default function RootLayout({
       <body className="min-h-full flex flex-col bg-ink text-paper antialiased">
         <ServiceWorkerRegistrar />
         {children}
-        <BottomNav />
+        <NavWrapper />
       </body>
     </html>
   );
