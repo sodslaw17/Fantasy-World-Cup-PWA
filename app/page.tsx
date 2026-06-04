@@ -278,7 +278,10 @@ export default async function Home() {
         {effEntries.length > 0 && (
           <EfficiencyLeaderboard entries={effEntries} />
         )}
-        <div className="pt-2">
+        <div className="pt-2 flex flex-col gap-2">
+          <Link href="/my-picks" className="text-xs text-gold underline underline-offset-2">
+            🗒 My draft pick preferences →
+          </Link>
           <Link href="/payouts" className="text-xs text-paper/40 underline underline-offset-2">
             View full payouts summary →
           </Link>
