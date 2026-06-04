@@ -1,8 +1,10 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useRef, useState } from "react";
 import { saveDraftPreferences } from "@/app/my-picks/actions";
+import { SortableTeamList } from "./SortableTeamList";
 import { SNAKE_PICKS } from "@/lib/draft";
+import { FIFA_RANKING_ORDER } from "@/lib/fifa-ranking";
 
 const initState = { error: undefined as string | undefined, success: false };
 
@@ -22,35 +24,55 @@ export function DraftPrefsForm({ teams, existing }: { teams: Team[]; existing: P
     initState
   );
 
-  const [wishlist, setWishlist] = useState<string[]>(existing?.team_wishlist ?? []);
+  // Build lookup: code → name
+  const teamByCode = Object.fromEntries(teams.map((t) => [t.fifa_code, t.name]));
 
-  // Groups for select option grouping
-  const byGroup: Record<string, Team[]> = {};
-  for (const t of teams) {
-    const g = t.group_letter ?? "?";
-    (byGroup[g] ??= []).push(t);
-  }
+  // Build initial sorted team list — use saved wishlist order if it exists,
+  // otherwise fall back to FIFA ranking order, then append any remaining teams
+  const buildInitialOrder = (): { code: string; name: string }[] => {
+    const saved = existing?.team_wishlist ?? [];
+    const fallbackOrder = FIFA_RANKING_ORDER.filter((c) => teamByCode[c]);
+    const allCodes = [
+      ...saved.filter((c) => teamByCode[c]),
+      ...fallbackOrder.filter((c) => !saved.includes(c)),
+      ...teams.map((t) => t.fifa_code).filter((c) => !fallbackOrder.includes(c) && !saved.includes(c)),
+    ];
+    return allCodes.map((code) => ({ code, name: teamByCode[code] ?? code }));
+  };
 
-  function addSlot() {
-    if (wishlist.length < 10) setWishlist([...wishlist, ""]);
-  }
-  function setSlot(i: number, code: string) {
-    const next = [...wishlist];
-    next[i] = code;
-    setWishlist(next);
-  }
-  function removeSlot(i: number) {
-    setWishlist(wishlist.filter((_, j) => j !== i));
+  const [orderedCodes, setOrderedCodes] = useState<string[]>(
+    () => buildInitialOrder().map((t) => t.code)
+  );
+  const [initialTeams] = useState(() => buildInitialOrder());
+
+  // Hidden input synced with current drag order
+  const hiddenRef = useRef<HTMLInputElement>(null);
+
+  function handleOrderChange(codes: string[]) {
+    setOrderedCodes(codes);
+    if (hiddenRef.current) hiddenRef.current.value = codes.join(",");
   }
 
   return (
-    <form action={action} className="space-y-5">
+    <form action={action} className="space-y-6">
+      {/* Hidden: full team wishlist as comma-separated codes */}
+      <input
+        ref={hiddenRef}
+        type="hidden"
+        name="team_wishlist"
+        defaultValue={orderedCodes.join(",")}
+      />
+
       {/* Snake position preference */}
       <div className="space-y-1.5">
-        <label className="block text-sm font-medium">Preferred snake-draft position</label>
-        <select name="preferred_position"
+        <label className="block text-sm font-medium">
+          Preferred snake-draft position
+        </label>
+        <select
+          name="preferred_position"
           defaultValue={existing?.preferred_position?.toString() ?? ""}
-          className="w-full rounded-lg bg-ink border border-paper/20 px-3 py-2.5 text-sm text-paper focus:outline-none focus:ring-1 focus:ring-gold min-h-tap">
+          className="w-full rounded-lg bg-ink border border-paper/20 px-3 py-2.5 text-sm text-paper focus:outline-none focus:ring-1 focus:ring-gold min-h-tap"
+        >
           <option value="">— no preference —</option>
           {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => (
             <option key={n} value={n}>
@@ -58,58 +80,43 @@ export function DraftPrefsForm({ teams, existing }: { teams: Team[]; existing: P
             </option>
           ))}
         </select>
-        <p className="text-xs text-paper/40">
-          Position 1 = first pick overall AND last pick of round 2 (snake draft).
-        </p>
       </div>
 
-      {/* Team wishlist */}
+      {/* Team wishlist — drag to reorder */}
       <div className="space-y-2">
-        <label className="block text-sm font-medium">Team wishlist (ranked, 1st = top pick)</label>
-        {wishlist.map((code, i) => (
-          <div key={i} className="flex items-center gap-2">
-            <span className="text-xs text-paper/40 w-5 text-right shrink-0">{i + 1}</span>
-            <input type="hidden" name={`team_${i + 1}`} value={code} />
-            <select value={code} onChange={(e) => setSlot(i, e.target.value)}
-              className="flex-1 rounded-lg bg-ink border border-paper/20 px-3 py-2.5 text-sm text-paper focus:outline-none focus:ring-1 focus:ring-gold min-h-tap">
-              <option value="">— select team —</option>
-              {Object.keys(byGroup).sort().map((g) => (
-                <optgroup key={g} label={`Group ${g}`}>
-                  {byGroup[g].map((t) => (
-                    <option key={t.fifa_code} value={t.fifa_code}>{t.name}</option>
-                  ))}
-                </optgroup>
-              ))}
-            </select>
-            <button type="button" onClick={() => removeSlot(i)}
-              className="text-paper/30 hover:text-accent-red text-lg px-1">×</button>
-          </div>
-        ))}
-        {/* Fill hidden inputs for unused slots */}
-        {Array.from({ length: 10 - wishlist.length }, (_, i) => (
-          <input key={i} type="hidden" name={`team_${wishlist.length + i + 1}`} value="" />
-        ))}
-        {wishlist.length < 10 && (
-          <button type="button" onClick={addSlot}
-            className="text-xs text-gold underline underline-offset-2">
-            + Add team
-          </button>
-        )}
+        <div>
+          <label className="block text-sm font-medium">Team preference order</label>
+          <p className="text-xs text-paper/40 mt-0.5">
+            Drag to rank all teams from most to least wanted. Default order is FIFA ranking.
+            Hold briefly then drag on mobile.
+          </p>
+        </div>
+        <SortableTeamList
+          teams={initialTeams}
+          onChange={handleOrderChange}
+        />
       </div>
 
       {/* Notes */}
       <div className="space-y-1.5">
         <label className="block text-sm font-medium">Notes for the admin</label>
-        <textarea name="notes" defaultValue={existing?.notes ?? ""} rows={3}
+        <textarea
+          name="notes"
+          defaultValue={existing?.notes ?? ""}
+          rows={3}
           placeholder="Any instructions if you can't be reached during the draft…"
-          className="w-full rounded-lg bg-ink border border-paper/20 px-3 py-2.5 text-sm text-paper placeholder:text-paper/30 focus:outline-none focus:ring-1 focus:ring-gold resize-y" />
+          className="w-full rounded-lg bg-ink border border-paper/20 px-3 py-2.5 text-sm text-paper placeholder:text-paper/30 focus:outline-none focus:ring-1 focus:ring-gold resize-y"
+        />
       </div>
 
       {state.error && <p className="text-sm text-accent-red">{state.error}</p>}
       {state.success && <p className="text-sm text-accent-green">✓ Preferences saved.</p>}
 
-      <button type="submit" disabled={pending}
-        className="w-full rounded-lg bg-gold text-ink font-semibold py-3 min-h-tap disabled:opacity-50">
+      <button
+        type="submit"
+        disabled={pending}
+        className="w-full rounded-lg bg-gold text-ink font-semibold py-3 min-h-tap disabled:opacity-50"
+      >
         {pending ? "Saving…" : "Save preferences"}
       </button>
     </form>

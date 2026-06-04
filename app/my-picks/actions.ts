@@ -19,12 +19,11 @@ export async function saveDraftPreferences(formData: FormData): Promise<ActionRe
   const position = parseInt(formData.get("preferred_position") as string) || null;
   const notes = (formData.get("notes") as string)?.trim() || null;
 
-  // Collect ranked team wishlist (up to 10 slots)
-  const wishlist: string[] = [];
-  for (let i = 1; i <= 10; i++) {
-    const code = (formData.get(`team_${i}`) as string)?.trim().toUpperCase();
-    if (code) wishlist.push(code);
-  }
+  // Full ranked team wishlist — all 48 codes in preferred order (comma-separated)
+  const wishlistRaw = (formData.get("team_wishlist") as string)?.trim();
+  const wishlist = wishlistRaw
+    ? wishlistRaw.split(",").map((c) => c.trim().toUpperCase()).filter(Boolean)
+    : [];
 
   const { error } = await service.from("draft_preferences").upsert({
     profile_id: profile.id,
