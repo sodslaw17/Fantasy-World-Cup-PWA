@@ -41,22 +41,48 @@ export default async function Home() {
 
   // ── Draft standby ──────────────────────────────────────────────────────────
   if (phase === "draft_standby") {
-    const { data: myProfile } = await service
-      .from("profiles").select("id").eq("auth_id", user.id).maybeSingle();
+    const [{ data: myProfileRow }, { data: draftPrefs }, { data: teams }] = await Promise.all([
+      service.from("profiles").select("id").eq("auth_id", user.id).maybeSingle(),
+      service.from("draft_preferences").select("*"),
+      service.from("teams").select("fifa_code, name"),
+    ]);
 
+    // My drafted teams (if draft locked)
     const myTeams: { teamName: string; fifaCode: string }[] = [];
-    if (myProfile?.id) {
+    if (myProfileRow?.id) {
       const { data: myDrafts } = await service
         .from("drafts")
         .select("pick_number, teams(id, fifa_code, name)")
-        .eq("profile_id", myProfile.id)
+        .eq("profile_id", myProfileRow.id)
         .order("pick_number");
-
       for (const d of myDrafts ?? []) {
         const t = Array.isArray(d.teams) ? d.teams[0] : d.teams;
         if (t) myTeams.push({ teamName: t.name, fifaCode: t.fifa_code });
       }
     }
+
+    // Group stage leaderboard (final standings)
+    const groupLeaderboard = computeLeaderboard(
+      profiles ?? [],
+      groupMatches,
+      predictions ?? []
+    );
+
+    // Team name lookup for wishlists
+    const teamNameMap: Record<string, string> = Object.fromEntries(
+      (teams ?? []).map((t: { fifa_code: string; name: string }) => [t.fifa_code, t.name])
+    );
+
+    // Draft preferences keyed by profile_id
+    const prefByProfile: Record<string, { preferred_position: number | null; team_wishlist: string[] | null; notes: string | null }> =
+      Object.fromEntries((draftPrefs ?? []).map((p) => [p.profile_id, p]));
+
+    // Build per-user standby info (profile_id, name, avatar, leaderboard rank, pref)
+    const standbyEntries = groupLeaderboard.map((e) => ({
+      ...e,
+      avatarUrl: (profiles ?? []).find((p: { auth_id: string | null }) => p.auth_id === e.authId) as { avatar_url: string | null } | undefined,
+      pref: prefByProfile[e.profileId] ?? null,
+    }));
 
     return (
       <StandbyView
@@ -64,6 +90,10 @@ export default async function Home() {
         myTeams={myTeams}
         draftLocked={s?.draft_locked ?? false}
         isAdmin={admin}
+        leaderboard={standbyEntries}
+        teamNameMap={teamNameMap}
+        totalMatches={groupMatches.length}
+        finishedMatches={groupMatches.filter((m: Match) => m.status === "finished").length}
       />
     );
   }
