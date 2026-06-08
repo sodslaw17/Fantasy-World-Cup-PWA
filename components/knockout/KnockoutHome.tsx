@@ -53,9 +53,8 @@ export function KnockoutHome({
           </div>
           <div className="flex gap-4 mt-2 pt-2 border-t border-gold/20">
             {[
-              { label: "Group pts",   value: me.groupPoints   },
-              { label: "Knockout pts", value: me.knockoutPoints },
-              { label: "GD",          value: me.goalDifference >= 0 ? `+${me.goalDifference}` : String(me.goalDifference) },
+              { label: "Group pts",    value: String(me.groupPoints)    },
+              { label: "Knockout pts", value: String(me.knockoutPoints) },
             ].map(({ label, value }) => (
               <div key={label} className="flex-1 text-center">
                 <p className="text-sm font-semibold tabular-nums">{value}</p>

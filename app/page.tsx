@@ -158,8 +158,15 @@ export default async function Home() {
         awayIconUrl: teamByCode[m.away_team_code ?? ""]?.custom_icon_url,
       }));
 
+    // Only show GD for players who are actually tied on points with someone else
+    const tiedPointValues = new Set(
+      overallBoard
+        .filter((e, _, arr) => arr.some((o) => o.profileId !== e.profileId && o.totalPoints === e.totalPoints))
+        .map((e) => e.totalPoints)
+    );
+
     return (
-      <div className="min-h-screen pb-24">
+      <div className="min-h-screen pb-32">
         <header className="px-4 pt-5 pb-3 flex items-center justify-between">
           <h1 className="text-lg font-bold text-gold">WC26 Pool</h1>
           {admin && (
@@ -182,26 +189,36 @@ export default async function Home() {
             Overall leaderboard
           </h2>
           <div className="space-y-2">
-            {overallBoard.map((e) => (
-              <div key={e.profileId}
-                className={`rounded-xl border px-4 py-3 flex items-center gap-3 ${
-                  e.authId === user.id ? "bg-gold/10 border-gold/30" : "bg-ink-soft border-paper/10"
-                }`}>
-                <span className="w-6 text-sm font-bold text-paper/40 shrink-0 tabular-nums">
-                  {e.rank}
-                </span>
-                <span className={`flex-1 text-sm font-semibold truncate ${e.authId === user.id ? "text-gold" : ""}`}>
-                  {e.displayName}{e.authId === user.id && <span className="text-xs font-normal text-gold/60 ml-1">(you)</span>}
-                </span>
-                <div className="text-right text-xs text-paper/50 shrink-0">
-                  <span className="font-bold text-sm text-paper tabular-nums">{e.totalPoints}</span>
-                  <span className="ml-0.5">pts</span>
-                  <span className="ml-2 tabular-nums">
-                    GD {e.goalDifference >= 0 ? `+${e.goalDifference}` : e.goalDifference}
+            {overallBoard.map((e) => {
+              const isTied = tiedPointValues.has(e.totalPoints);
+              return (
+                <div key={e.profileId}
+                  className={`rounded-xl border px-4 py-3 flex items-center gap-3 ${
+                    e.authId === user.id ? "bg-gold/10 border-gold/30" : "bg-ink-soft border-paper/10"
+                  }`}>
+                  <span className="w-6 text-sm font-bold text-paper/40 shrink-0 tabular-nums">
+                    {e.rank}
                   </span>
+                  <span className={`flex-1 text-sm font-semibold truncate ${e.authId === user.id ? "text-gold" : ""}`}>
+                    {e.displayName}{e.authId === user.id && <span className="text-xs font-normal text-gold/60 ml-1">(you)</span>}
+                  </span>
+                  <div className="text-right text-xs text-paper/50 shrink-0">
+                    <span className="font-bold text-sm text-paper tabular-nums">{e.totalPoints}</span>
+                    <span className="ml-0.5">pts</span>
+                    {isTied && (
+                      <span className="ml-2 tabular-nums text-paper/40">
+                        GD {e.goalDifference >= 0 ? `+${e.goalDifference}` : e.goalDifference}
+                      </span>
+                    )}
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
+            {tiedPointValues.size > 0 && (
+              <p className="text-xs text-paper/30 text-center">
+                GD shown for tied players — tiebreaker is combined knockout goal difference
+              </p>
+            )}
           </div>
         </div>
       </div>
