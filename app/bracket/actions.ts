@@ -24,11 +24,6 @@ export async function getBracketData() {
     (teams ?? []).map((t: { fifa_code: string; name: string }) => [t.fifa_code, t.name])
   );
 
-  // Build team_id → fifa_code
-  const teamCodeById: Record<string, string> = Object.fromEntries(
-    (teams ?? []).map((t: { fifa_code: string; id?: string }) => [t.fifa_code, t.fifa_code])
-  );
-
   // Fetch team codes for draft team_ids separately
   const draftTeamIds = (rawDrafts ?? []).map((d: { team_id: string }) => d.team_id);
   const { data: draftTeams } = draftTeamIds.length > 0

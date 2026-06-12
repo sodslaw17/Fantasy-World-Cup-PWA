@@ -42,6 +42,16 @@ export async function GET(request: NextRequest) {
     .eq("email", data.user.email!)
     .is("auth_id", null);
 
+  // Save timezone on first login (only if not already set)
+  const tz = searchParams.get("tz");
+  if (tz) {
+    await service
+      .from("profiles")
+      .update({ timezone: tz })
+      .eq("email", data.user.email!)
+      .is("timezone", null);
+  }
+
   const redirectTo = next.startsWith("/") ? `${origin}${next}` : origin;
   return NextResponse.redirect(redirectTo);
 }

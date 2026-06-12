@@ -50,7 +50,7 @@ export function PenaltyManager({ matches }: { matches: ShootoutMatch[] }) {
   return (
     <div className="space-y-4">
       <p className="text-xs text-paper/50">
-        Events affect the drafter's knockout score: −1 off-target, −1 Panenka fail, +1 Panenka score.
+        Events affect the drafter&apos;s knockout score: −1 off-target, −1 Panenka fail, +1 Panenka score.
       </p>
 
       {/* Match selector */}

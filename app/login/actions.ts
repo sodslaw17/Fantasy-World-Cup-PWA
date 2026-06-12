@@ -19,7 +19,7 @@ export async function loginAction(formData: FormData): Promise<ActionResult> {
   const service = createServiceClient();
   const { data: profile } = await service
     .from("profiles")
-    .select("email")
+    .select("email, timezone")
     .eq("email", email)
     .maybeSingle();
 
@@ -30,12 +30,18 @@ export async function loginAction(formData: FormData): Promise<ActionResult> {
     };
   }
 
+  // Build redirect URL — include tz param only on first login (profile has no timezone yet)
+  const base = `${process.env.NEXT_PUBLIC_SITE_URL}/auth/callback`;
+  const tz = formData.get("timezone");
+  const redirectTo =
+    !profile.timezone && typeof tz === "string" && tz
+      ? `${base}?tz=${encodeURIComponent(tz)}`
+      : base;
+
   const supabase = await createClient();
   const { error } = await supabase.auth.signInWithOtp({
     email,
-    options: {
-      emailRedirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/auth/callback`,
-    },
+    options: { emailRedirectTo: redirectTo },
   });
 
   if (error) {

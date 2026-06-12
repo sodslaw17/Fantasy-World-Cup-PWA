@@ -8,11 +8,6 @@ interface KnockoutMatch extends Match {
   awayIconUrl?: string | null;
 }
 
-interface DraftedMatchInfo {
-  match: KnockoutMatch;
-  myTeams: string[]; // which of my teams are in this match
-}
-
 export function KnockoutHome({
   todayMatches,
   myDraftedCodes,

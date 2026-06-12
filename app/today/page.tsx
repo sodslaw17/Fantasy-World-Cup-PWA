@@ -15,11 +15,23 @@ export default async function TodayPage() {
 
   const service = createServiceClient();
 
-  // Today in UTC
+  // Fetch the user's profile to get their stored timezone
+  const { data: myProfile } = await service
+    .from("profiles")
+    .select("timezone")
+    .eq("auth_id", user.id)
+    .maybeSingle();
+
+  const userTz = myProfile?.timezone ?? "America/Chicago";
+
+  // Compute today's UTC window in the user's local timezone so that browsing
+  // in the evening doesn't flip to tomorrow's games. (Requires server to run
+  // UTC, which Vercel does.)
   const now = new Date();
-  const startUTC = new Date(
-    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate())
-  );
+  const todayStr = now.toLocaleDateString("sv-SE", { timeZone: userTz });
+  const approxLocalNow = new Date(now.toLocaleString("en-US", { timeZone: userTz }));
+  const offsetMs = now.getTime() - approxLocalNow.getTime();
+  const startUTC = new Date(new Date(todayStr + "T00:00:00Z").getTime() + offsetMs);
   const endUTC = new Date(startUTC.getTime() + 86_400_000);
 
   const [
@@ -87,7 +99,8 @@ export default async function TodayPage() {
     };
   });
 
-  const todayLabel = now.toLocaleDateString(undefined, {
+  const todayLabel = now.toLocaleDateString("en-US", {
+    timeZone: userTz,
     weekday: "long",
     month: "long",
     day: "numeric",
@@ -102,7 +115,6 @@ export default async function TodayPage() {
       <div className="px-4">
         <TodayView
           matches={enrichedMatches}
-          currentAuthId={user.id}
           deadlinePassed={deadlinePassed}
         />
       </div>

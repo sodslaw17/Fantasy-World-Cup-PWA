@@ -140,12 +140,6 @@ export async function loadDemoData(): Promise<{ success?: boolean; error?: strin
       }).eq("id", groupMatches[i].id);
     }
 
-    // Auto-populate match_stats (goals only)
-    const statsRows = groupMatches.flatMap((m, i) => {
-      const { data: match } = { data: null }; // will fetch below
-      return [];
-    });
-
     // Fetch with team codes to populate stats
     const { data: matchesFull } = await service
       .from("matches").select("id, home_team_code, away_team_code, home_goals, away_goals")

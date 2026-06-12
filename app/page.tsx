@@ -112,8 +112,6 @@ export default async function Home() {
       team_code: (Array.isArray(d.teams) ? d.teams[0]?.fifa_code : d.teams?.fifa_code) ?? "",
     }));
 
-    const teamById: Record<string, { name: string; custom_icon_url: string | null }> =
-      Object.fromEntries((teams ?? []).map((t: { id: string; name: string; custom_icon_url: string | null }) => [t.id, t]));
     const teamByCode: Record<string, { name: string; custom_icon_url: string | null }> =
       Object.fromEntries((teams ?? []).map((t: { fifa_code: string; name: string; custom_icon_url: string | null }) => [t.fifa_code, t]));
 
@@ -232,11 +230,6 @@ export default async function Home() {
   const me = leaderboard.find((e) => e.authId === user.id);
   const leader = leaderboard[0];
 
-  // Build profile avatar map
-  const avatarByAuthId: Record<string, string | null> = Object.fromEntries(
-    (profiles ?? []).map((p: { auth_id: string | null; avatar_url: string | null }) => [p.auth_id, p.avatar_url])
-  );
-
   // Efficiency leaderboard data
   const effEntries = computeEfficiencyLeaderboard(
     (effPicks ?? []).map((p) => {
@@ -286,6 +279,11 @@ export default async function Home() {
 
       <MyStatsCard me={me} leader={leader} totalPlayers={leaderboard.length} />
       <div className="px-4 space-y-2">
+        {phase === "predictions" || phase === "group" ? (
+          <Link href="/my-picks" className="block text-xs text-gold underline underline-offset-2 pb-1">
+            🗒 My draft pick preferences →
+          </Link>
+        ) : null}
         <LeaderboardTable
           entries={leaderboard}
           currentAuthId={user.id}
@@ -296,9 +294,11 @@ export default async function Home() {
           <EfficiencyLeaderboard entries={effEntries} />
         )}
         <div className="pt-2 flex flex-col gap-2">
-          <Link href="/my-picks" className="text-xs text-gold underline underline-offset-2">
-            🗒 My draft pick preferences →
-          </Link>
+          {phase !== "predictions" && phase !== "group" && (
+            <Link href="/my-picks" className="text-xs text-gold underline underline-offset-2">
+              🗒 My draft pick preferences →
+            </Link>
+          )}
           <Link href="/payouts" className="text-xs text-paper/40 underline underline-offset-2">
             View full payouts summary →
           </Link>

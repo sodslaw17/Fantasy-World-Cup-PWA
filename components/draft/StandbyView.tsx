@@ -191,7 +191,7 @@ export function StandbyView({
                       </div>
                     )}
                     {e.pref.notes && (
-                      <p className="text-xs text-paper/50 italic">"{e.pref.notes}"</p>
+                      <p className="text-xs text-paper/50 italic">&ldquo;{e.pref.notes}&rdquo;</p>
                     )}
                   </div>
                 ) : (

@@ -4,12 +4,13 @@ import { BottomNav } from "./BottomNav";
 import type { Settings } from "@/lib/db";
 
 export async function NavWrapper() {
+  let phase: Phase = "predictions";
   try {
     const service = createServiceClient();
     const { data: settings } = await service.from("settings").select("*").single();
-    const phase: Phase = settings ? getCurrentPhase(settings as Settings) : "predictions";
-    return <BottomNav phase={phase} />;
+    if (settings) phase = getCurrentPhase(settings as Settings);
   } catch {
-    return <BottomNav phase="predictions" />;
+    // fall through with default phase
   }
+  return <BottomNav phase={phase} />;
 }

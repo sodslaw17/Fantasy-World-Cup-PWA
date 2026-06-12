@@ -24,7 +24,6 @@ export default async function PayoutsPage() {
     { data: drafts },
     { data: matchStats },
     { data: penaltyEvents },
-    { data: teams },
   ] = await Promise.all([
     service.from("profiles").select("id, display_name, auth_id"),
     service.from("matches").select("*"),
@@ -33,7 +32,6 @@ export default async function PayoutsPage() {
     service.from("drafts").select("profile_id, team_id, teams(fifa_code)"),
     service.from("match_stats").select("*"),
     service.from("penalty_events").select("match_id, team_code, type"),
-    service.from("teams").select("fifa_code, name"),
   ]);
 
   const groupMatches = ((allMatches ?? []) as Match[]).filter((m) => m.stage === "group");

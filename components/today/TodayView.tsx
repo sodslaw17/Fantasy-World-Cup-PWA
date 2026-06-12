@@ -16,11 +16,9 @@ export interface TodayMatch extends Match {
 
 export function TodayView({
   matches,
-  currentAuthId,
   deadlinePassed,
 }: {
   matches: TodayMatch[];
-  currentAuthId: string | null;
   deadlinePassed: boolean;
 }) {
   if (matches.length === 0) {
@@ -39,7 +37,6 @@ export function TodayView({
         <MatchBlock
           key={match.id}
           match={match}
-          currentAuthId={currentAuthId}
           deadlinePassed={deadlinePassed}
         />
       ))}
@@ -49,11 +46,9 @@ export function TodayView({
 
 function MatchBlock({
   match,
-  currentAuthId,
   deadlinePassed,
 }: {
   match: TodayMatch;
-  currentAuthId: string | null;
   deadlinePassed: boolean;
 }) {
   const kickoff = new Date(match.kickoff_utc);
