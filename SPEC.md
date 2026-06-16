@@ -150,6 +150,10 @@ Rounds: **Round of 32** (Jun 28–Jul 3), **Round of 16** (Jul 4–7), **Quarter
 - Who has matches today — each team optionally shows an **admin-uploaded custom icon stacked over the country flag/federation logo**
 - My stats: rank, total points, points behind leader
 - Full leaderboard (combined / overall)
+- **Bracket tab** — full knockout bracket showing all rounds from R32 to Final
+  - **Path to the final (tap-to-trace):** tapping a team highlights its route up the bracket — its current match, then each subsequent round shown as a placeholder opponent ("Winner of Match X") that resolves to the actual team as results come in — all the way to the Final. The selected route is visually emphasized and the rest de-emphasized; tapping again (or tapping empty space) clears it. Keep the existing drafted-team highlighting; the tapped-team path overlays on top of it.
+  - Respects light/dark and the per-user theme accent for the highlighted path; maintain WCAG AA contrast and ≥44×44 px tap targets on team chips.
+  - **Data prerequisite:** each match must reference the two matches that feed its slots and the match its winner advances to (`home_feed_match_id`, `away_feed_match_id`, `winner_advances_to_match_id`). The path is computed by walking this graph from the tapped team up to the Final. Add these FK columns if not already present; do not change unrelated bracket logic.
 
 **Names always carry their icon (everywhere they appear):**
 - A **user's name** always shows that user's floating-head avatar inline beside it.
