@@ -34,11 +34,14 @@ export async function saveMatchResult(formData: FormData): Promise<ActionResult>
     .from("matches")
     .update({
       home_goals: homeGoals,
+      home_goals_manual: homeGoals,
       away_goals: awayGoals,
+      away_goals_manual: awayGoals,
       went_to_et: wentToET,
       went_to_shootout: wentToShootout,
       shootout_winner: wentToShootout ? shootoutWinner : null,
       status: "finished",
+      status_manual: "finished",
     })
     .eq("id", matchId);
 
@@ -69,10 +72,12 @@ export async function saveMatchResult(formData: FormData): Promise<ActionResult>
 
 /** Create a new knockout match (teams determined after group stage). */
 export async function createKnockoutMatch(formData: FormData): Promise<ActionResult> {
-  const stage         = formData.get("stage") as string;
-  const homeTeamCode  = (formData.get("home_team_code") as string)?.trim().toUpperCase() || null;
-  const awayTeamCode  = (formData.get("away_team_code") as string)?.trim().toUpperCase() || null;
-  const kickoffUtc    = (formData.get("kickoff_utc") as string)?.trim();
+  const stage           = formData.get("stage") as string;
+  const homeTeamCode    = (formData.get("home_team_code") as string)?.trim().toUpperCase() || null;
+  const awayTeamCode    = (formData.get("away_team_code") as string)?.trim().toUpperCase() || null;
+  const kickoffUtc      = (formData.get("kickoff_utc") as string)?.trim();
+  const homeFeedMatchId = (formData.get("home_feed_match_id") as string)?.trim() || null;
+  const awayFeedMatchId = (formData.get("away_feed_match_id") as string)?.trim() || null;
 
   if (!stage || !kickoffUtc || isNaN(Date.parse(kickoffUtc))) {
     return { error: "Stage and a valid UTC kickoff time are required." };
@@ -85,10 +90,31 @@ export async function createKnockoutMatch(formData: FormData): Promise<ActionRes
     away_team_code: awayTeamCode,
     kickoff_utc: kickoffUtc,
     status: "scheduled",
+    home_feed_match_id: homeFeedMatchId,
+    away_feed_match_id: awayFeedMatchId,
   });
 
   if (error) return { error: error.message };
 
   revalidatePath("/admin/results");
+  revalidatePath("/bracket");
+  return { success: true };
+}
+
+/** Set bracket progression wiring for a knockout match (which earlier matches feed each slot). */
+export async function setMatchFeeds(
+  matchId: string,
+  homeFeedId: string | null,
+  awayFeedId: string | null
+): Promise<ActionResult> {
+  const service = createServiceClient();
+  const { error } = await service.from("matches").update({
+    home_feed_match_id: homeFeedId || null,
+    away_feed_match_id: awayFeedId || null,
+  }).eq("id", matchId);
+
+  if (error) return { error: error.message };
+  revalidatePath("/admin/results");
+  revalidatePath("/bracket");
   return { success: true };
 }

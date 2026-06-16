@@ -39,6 +39,19 @@ export interface Match {
   went_to_et: boolean;
   went_to_shootout: boolean;
   shootout_winner: ShootoutWinner | null;
+  // Bracket progression wiring (migration 011)
+  home_feed_match_id: string | null;
+  away_feed_match_id: string | null;
+  // Auto/manual sync columns (migration 009)
+  home_goals_auto: number | null;
+  away_goals_auto: number | null;
+  home_goals_manual: number | null;
+  away_goals_manual: number | null;
+  status_auto: MatchStatus | null;
+  status_manual: MatchStatus | null;
+  went_to_shootout_auto: boolean | null;
+  shootout_winner_auto: ShootoutWinner | null;
+  last_synced_at: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -67,6 +80,14 @@ export interface EfficiencyPick {
   goals: number;
   assists: number;
   minutes: number;
+  // Auto/manual sync columns (migration 009)
+  goals_auto: number | null;
+  assists_auto: number | null;
+  minutes_auto: number | null;
+  goals_manual: number | null;
+  assists_manual: number | null;
+  minutes_manual: number | null;
+  last_synced_at: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -88,8 +109,46 @@ export interface MatchStat {
   yellows: number;
   second_yellows: number;
   straight_reds: number;
+  // Auto/manual sync columns (migration 009)
+  yellows_auto: number;
+  second_yellows_auto: number;
+  straight_reds_auto: number;
+  yellows_manual: number | null;
+  second_yellows_manual: number | null;
+  straight_reds_manual: number | null;
+  last_synced_at: string | null;
   created_at: string;
   updated_at: string;
+}
+
+export interface ApiIdMapping {
+  id: string;
+  resource_type: "team" | "player" | "fixture";
+  internal_id: string;
+  provider: string;
+  api_id: string;
+  verified: boolean;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SyncLog {
+  id: string;
+  started_at: string;
+  finished_at: string | null;
+  trigger: "cron" | "manual";
+  in_live_window: boolean;
+  skipped: boolean;
+  matches_checked: number;
+  matches_updated: number;
+  stats_updated: number;
+  picks_updated: number;
+  api_requests: number;
+  unmapped_teams: string[];
+  unmapped_players: string[];
+  errors: string[];
+  status: "running" | "ok" | "error" | "skipped";
 }
 
 export interface Settings {
