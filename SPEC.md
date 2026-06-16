@@ -178,11 +178,13 @@ Core tables (refine as needed):
 ## 9. Admin tooling
 - Manage users: list of email + display name (these define who can log in).
 - Confirm/lock the **draft order** and each user's drafted teams.
-- Enter all stat data needed for scoring **manually** (no API dependency required):
-  - per match: open-play/ET result + shootout outcome + per-team goals (scoring engine recomputes)
+- **Review & override auto-synced data** (§10): scores, per-team cards, and efficiency-player goals are
+  auto-filled from the API; admin sees `auto` vs effective values, can **override** any field (manual wins,
+  sticky), clear an override to fall back to auto, and trigger a manual re-sync. Maintain the API↔internal
+  **ID mapping** for teams and efficiency players.
+- Enter the data the API can't provide **manually**:
   - penalty-shootout events (off-target / Panenka fail / Panenka score) per drafted player
-  - 1st Side Pot: each user's chosen footballer + that player's goals, assists, minutes
-  - 2nd Side Pot: per drafted team cards (yellows, second yellows, straight reds)
+  - any score/stat the API got wrong or hasn't posted yet (via the override above)
 - Upload & manage image assets:
   - a **floating-head avatar per user**
   - a **floating-head icon per efficiency-player pick**
@@ -192,11 +194,41 @@ Core tables (refine as needed):
 
 ---
 
-## 10. Data ingestion
-Build importers (CSV or JSON) so real data can be plugged in later. Define and ship a
-documented schema + a few sample rows for: teams (with group), the 72 group fixtures, and
-the knockout bracket structure. Results/stats flow in via admin forms now, with an optional
-external API adapter later. **Do not hardcode the draw** — load it from the importer.
+## 10. Data ingestion & automated sync
+**Static data (importers):** ship documented CSV/JSON importers + sample rows for teams (with group),
+the 72 group fixtures, and the knockout bracket structure. **Do not hardcode the draw** — load it from the importer.
+
+**Live data (automated sync, with manual override):** a server-side job pulls match scores, cards
+(yellow / 2nd yellow / red, per team), and goals for each user's efficiency-player pick from a football
+data API, to cut manual admin work. Design:
+- **Provider:** a free-tier football API that covers WC2026 events + player stats (see notes below).
+  API key in **server-side env vars only**.
+- **ID mapping (required first step):** a mapping table linking the API's team IDs and player IDs to our
+  internal `teams` and `efficiency_picks` rows. Auto-sync cannot match without it; seed/confirm via admin UI.
+- **Scheduler:** Vercel Cron or Supabase pg_cron. Poll **frequently only during live-match windows**
+  (e.g. every 1–5 min) and rarely otherwise, to respect free-tier rate limits. Cache responses.
+- **Override model (manual always wins):** for every synced field, store both an `auto_value` and an
+  optional `manual_value`; the **effective value = manual_value ?? auto_value**. Admin editing sets
+  `manual_value` (sticky — sync never overwrites it); clearing it falls back to `auto`. Scoring/standings
+  always use the effective value. Show `auto` vs `effective` side-by-side with a "last synced" timestamp
+  and flag discrepancies for admin review.
+- **Trust posture:** payouts ride on these numbers, so treat the API as a convenience that **pre-fills**;
+  the admin remains the source of truth via override. Penalty-shootout/Panenka events stay manual (no
+  affordable API exposes them).
+
+**Efficiency-player goal tracker:** using the mapping above, sync each user's chosen player's **goals**
+(most reliable), plus assists/minutes where available, and surface a side-pot tracker/leaderboard ranking
+users by their player's `(goals + assists) / minutes` — with manual override on any value.
+
+**Provider notes (verify current pricing/limits at build time):**
+- *API-Football (api-sports.io)* — free tier ~100 req/day, covers WC2026 with match events (goals, cards,
+  subs), lineups, and player stats (goals/assists/minutes); best free fit for all three needs. Smart polling
+  + caching keeps under the limit; cheap paid tier if needed.
+- *football-data.org* — free tier ~10 calls/min, good for fixtures/scores/standings; thinner on player-level
+  cards/minutes.
+- *Free community feeds* (e.g. GitHub/Apify WC2026) — free but **uptime not guaranteed**; fine as a fallback
+  for scores/standings, risky for the card/player data that drives payouts.
+- *Sportmonks / TheStatsAPI / Sportradar* — fuller player data but paid.
 
 ---
 
@@ -306,6 +338,7 @@ The app supports a user-controlled **light / dark / system** theme toggle, appli
 6. Side pots + penalty-event scoring (manual entry) + payouts summary.
 7. Push notifications for the prediction-deadline countdown (§12b).
 8. App-wide light/dark mode toggle (§11.7) — semantic tokens, no-flash SSR, AA in both modes.
+9. Automated live-data sync (§10): provider adapter + ID mapping + scheduler + auto/manual override model + efficiency-player goal tracker. Build manual entry/override FIRST, then layer the API on top so the app always works without it.
 
 > Throughout: enforce the §11.5 accessibility rule (WCAG AA, nothing ever washes out) and the
 > §11.6 tap-target minimums on every screen.
