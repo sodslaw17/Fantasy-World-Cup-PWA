@@ -1,6 +1,7 @@
 # Fantasy World Cup 2026 — Project Spec
 
-> This is the single source of truth for the app. The rulebook below is transcribed
+> This is the single source of truth for the app — for both **Claude Code** (build) and
+> **Claude Design** (front-end design; see §11). The rulebook below is transcribed
 > verbatim-in-meaning from the organizer's screenshots. When in doubt, this file wins.
 > Tournament: FIFA World Cup 2026 (48 teams, 12 groups of 4, Round of 32 first knockout).
 
@@ -24,7 +25,7 @@ standby screen, then track their drafted knockout teams. A few users are **Admin
 
 - **Next.js (App Router)** deployed on **Vercel** free tier — PWA-friendly, generous for 10 users.
 - **Supabase** free tier — Postgres + passwordless (magic-link) Auth + Row-Level Security.
-- **Tailwind CSS** with a FIFA palette (see §11).
+- **Tailwind CSS**, themed on the World Cup 2026 "TRIONDA" design system (see §11).
 - PWA via web manifest + service worker (e.g. `next-pwa` or `@serwist/next`).
 - **Push notifications** via the Web Push API (VAPID keys — free, no third-party needed) for the prediction-deadline countdown; scheduled send via Vercel Cron or Supabase pg_cron (both free tier).
 - Roles via env var email allowlists: `ADMIN_EMAILS`, `SUPER_ADMIN_EMAILS`.
@@ -55,6 +56,11 @@ admin-configurable timestamps) decides what renders.
 
 **Prediction deadline:** the kickoff of the first group match (June 11). Store as one
 **UTC timestamp**, admin-editable. ("2pm Central" = "3pm EST" = the same instant.)
+
+**Per-user theming changes by phase:** during Buy-in/Predictions, Group matches, and Draft
+standby, everyone sees the shared TRIONDA palette. Once the **Knockout** phase begins **and**
+a user's drafted teams are recorded, that user's accent colors switch to a palette derived
+from the flag of the **first country they drafted** (see §11.3).
 
 ---
 
@@ -145,18 +151,24 @@ Rounds: **Round of 32** (Jun 28–Jul 3), **Round of 16** (Jul 4–7), **Quarter
 - My stats: rank, total points, points behind leader
 - Full leaderboard (combined / overall)
 
+**Names always carry their icon (everywhere they appear):**
+- A **user's name** always shows that user's floating-head avatar inline beside it.
+- A **player's name** (efficiency pick) always shows that player's floating-head icon inline beside it.
+- A **country's name** always shows that country's logo inline beside it.
+- Build these as three reusable "name + icon" components (`UserName`, `PlayerName`, `CountryName`) with consistent size/alignment/spacing and a sensible fallback when an icon hasn't been uploaded yet.
+
 ---
 
 ## 8. Data model (Postgres)
 
 Core tables (refine as needed):
-- `teams` (id, fifa_code, name, flag_url, custom_icon_url, group_letter)
+- `teams` (id, fifa_code, name, flag_url, **logo_url** (country logo shown beside the name), custom_icon_url (knockout icon stacked over the flag), **theme_primary_hex**, **theme_secondary_hex** (colors extracted from the flag, used for per-user theming — stored so the front end never extracts color from images at runtime), group_letter)
 - `groups` (letter A–L)
 - `matches` (id, stage, round, group_letter?, home_team, away_team, kickoff_utc, status, home_goals, away_goals, went_to_shootout, shootout_winner, ...)
 - `predictions` (user_id, match_id, home_goals_pred, away_goals_pred, updated_at) — unique (user_id, match_id)
-- `users` / profiles (id, email, display_name, is_admin, is_super_admin derived from env)
-- `drafts` (user_id, team_id, pick_number) — admin-entered, locked
-- `efficiency_picks` (user_id, player_name, team_id?, goals, assists, minutes) — the single footballer each user drafted for the 1st Side Pot; goals/assists/minutes are **admin-entered**. Efficiency = (goals + assists) / minutes.
+- `users` / profiles (id, email, display_name, **avatar_url** (floating-head shown beside the user's name), is_admin, is_super_admin derived from env)
+- `drafts` (user_id, team_id, pick_number) — admin-entered, locked. The user's **first pick** (lowest pick_number) drives their knockout theme (§11.3).
+- `efficiency_picks` (user_id, player_name, **icon_url** (floating-head shown beside the player's name), team_id?, goals, assists, minutes) — the single footballer each user drafted for the 1st Side Pot; goals/assists/minutes are **admin-entered**. Efficiency = (goals + assists) / minutes.
 - `penalty_events` (match_id, team_id, player_name?, type: off_target | panenka_fail | panenka_score) — **admin-entered**
 - `player_stats` (team_id, player?, goals, assists, minutes, yellows, second_yellows, straight_reds) — **admin-entered**, for the 2nd Side Pot (discipline)
 - `settings` (prediction_deadline_utc, draft_standby_text, current_phase_override?, ...)
@@ -171,7 +183,11 @@ Core tables (refine as needed):
   - penalty-shootout events (off-target / Panenka fail / Panenka score) per drafted player
   - 1st Side Pot: each user's chosen footballer + that player's goals, assists, minutes
   - 2nd Side Pot: per drafted team cards (yellows, second yellows, straight reds)
-- Upload a **custom icon per team**.
+- Upload & manage image assets:
+  - a **floating-head avatar per user**
+  - a **floating-head icon per efficiency-player pick**
+  - a **country logo per team** (shown beside the country name) and the **knockout custom icon per team** (stacked over the flag)
+  - per-team **theme colors** (`theme_primary_hex` / `theme_secondary_hex`) — admin can accept auto-extracted-from-flag defaults or override (§11.3)
 - Edit the **draft standby text** and the **prediction deadline**.
 
 ---
@@ -184,19 +200,73 @@ external API adapter later. **Do not hardcode the draw** — load it from the im
 
 ---
 
-## 11. Theming — FIFA World Cup 2026 ("We Are 26")
-The official **FIFA World Cup 26** brand is deliberately a *flexible system* (anchored on the
-trophy-inside-"26" emblem and the "We Are 26" campaign) rather than one fixed palette — host
-cities apply their own colors within it. So theme around its consistent anchors and expose
-everything as Tailwind tokens so values are easy to swap:
+## 11. Front-end design & theming
+> This section is also the design brief for Claude Design. The app must be unmistakably a
+> **FIFA World Cup 2026** experience, mobile-first for iPhone, aesthetically polished, and
+> fully legible at all times.
 
-- **Core anchors:** signature **gold** (the trophy), on a **black + white** base.
-- **Tri-host / multicolor accents:** vibrant red, blue, and green nodding to USA / Canada / Mexico,
-  used as secondary accents and category colors.
-- Suggested starting tokens (adjust to taste; not FIFA's exact published hex):
-  `gold #C8A24B`, `ink #0B0B0B`, `paper #FFFFFF`, `accent-red #E4002B`,
-  `accent-blue #0A3D91`, `accent-green #008A52`.
-- Mobile-first, large tap targets, good contrast, dark-mode-friendly. Confirm final hex with me.
+### 11.1 Visual style — anchored on the adidas TRIONDA match ball
+Use the official 2026 World Cup match ball, the **adidas TRIONDA**, as the core style reference:
+- A clean, **predominantly white base**, with vibrant **red, green, and blue** accents (the three
+  host nations: USA, Canada, Mexico).
+- **Gold** detailing reserved for trophy / winner / payout moments (1st place, champions, prize callouts).
+- **Flowing, wave-inspired geometry** (the "tri-onda / three waves" motif) — soft curves, fluid
+  dividers, wave shapes over hard rectangular blocks.
+- Optional subtle **triangle "unity" motif** where the three accent colors meet (echoing the ball's panels).
+- Sporty, celebratory, "most visually playful World Cup" energy — bold but clean.
+- Take **inspiration only** — do NOT reproduce the actual TRIONDA artwork, host-nation emblems, or
+  any FIFA logos/trademarks; use original shapes in the same spirit.
+
+### 11.2 Color tokens
+Expose everything as Tailwind tokens so values are easy to swap. Starting values (refine in design):
+`paper #FFFFFF`, `ink #14151A`, `accent-red #E4002B`, `accent-blue #0A3D91`,
+`accent-green #008A52`, `gold #C8A24B`. (These are a starting point, not FIFA's official hex.)
+
+### 11.3 Dynamic per-user theming (knockout)
+- During Buy-in/Predictions, Group, and Draft-standby phases, **all users share the TRIONDA palette**.
+- Once **Knockout** begins **and** a user's draft is recorded, that user's **accent** palette switches
+  to colors derived from the **flag of their first drafted country** (lowest `pick_number`), using the
+  stored `theme_primary_hex` / `theme_secondary_hex`.
+- Treat flag colors as an **accent/brand layer only** — they drive highlights, headers, active states,
+  and the user's personal accent. The **base (white) background and body text stay on the fixed,
+  accessible system** so legibility never depends on the flag.
+
+### 11.4 User-uploaded icons & "name + icon" components
+All icons are admin-uploaded (§9). Three reusable components render an icon inline next to a name
+**everywhere that name appears**, with consistent size/alignment/spacing and a graceful fallback when
+no icon is uploaded yet:
+- `UserName` → user's floating-head avatar
+- `PlayerName` → efficiency pick's floating-head icon
+- `CountryName` → country logo
+
+### 11.5 Accessibility — HARD RULE
+Every **button, every word of text, and every icon must always be fully visible and legible**, in every
+phase and under every per-user flag theme. Enforce **WCAG AA contrast or better automatically**; if a
+flag-derived color would fail contrast against its background or against text/controls, **adjust it**
+(darken/lighten/shift) rather than render something hard to see. Nothing ever washes out.
+
+### 11.6 Mobile & interaction
+- Mobile-first, iPhone-optimized (~390pt width); respect notch/safe areas and one-handed thumb reach.
+- Simple, obvious primary navigation (e.g. a bottom tab bar).
+- **Large tap targets:** all primary controls meet or exceed **44×44pt** with generous spacing. The
+  prediction screen's frequent +/- score inputs must be especially thumb-friendly and hard to mis-tap.
+- Native-app feel, light/dark friendly, premium and cohesive.
+
+### 11.7 Dark / light mode (user toggle)
+The app supports a user-controlled **light / dark / system** theme toggle, applied **app-wide**
+(all user-facing and admin pages).
+- Implement with semantic, theme-swapping tokens (CSS variables flipped via a `dark` class) —
+  e.g. `next-themes` + Tailwind `darkMode: 'class'`, SSR-safe with **no flash** on load.
+- Default to the user's **system preference**; persist their explicit choice (device-local
+  cookie/localStorage is sufficient for ~10 users; optional profile sync later).
+- Light base = TRIONDA white (`paper`); dark base = a deep neutral surface with near-white text.
+  Provide dark equivalents for every neutral token (`ink`, `ink-2/3`, `line/line-2`, surfaces,
+  shadows). Brand accents (`accent-red/green/blue`, `gold`) stay recognizable but adjust
+  shade/opacity where needed for contrast. **Gold stays reserved for winner/payout moments.**
+- The **§11.5 accessibility rule applies in BOTH modes** — including the §11.3 per-user flag
+  theming, whose accent must pass WCAG AA against the dark surface (adjust if it would fail).
+- Toggle control is accessible, ≥44×44pt, labeled, and reflects the current state; place it in
+  Settings and/or the account/nav menu.
 
 ---
 
@@ -227,10 +297,15 @@ everything as Tailwind tokens so values are easy to swap:
 ---
 
 ## 14. Build phases (suggested order)
-0. Scaffold: Next.js + Supabase + PWA manifest/SW + magic-link auth + role guards + FIFA theme.
-1. Data model + importers (teams/groups/fixtures) + admin user management.
+0. Scaffold: Next.js + Supabase + PWA manifest/SW + magic-link auth + role guards + TRIONDA-anchored theme + token system.
+1. Data model + importers (teams/groups/fixtures) + admin user management + asset uploads (avatars, player icons, country logos, team theme colors).
 2. Group prediction UI (autosave + server-side deadline lock) + group scoring engine + tests.
-3. Group-phase views (leaderboard, today's games, my/others predictions, my stats).
+3. Group-phase views (leaderboard, today's games, my/others predictions, my stats) + the `UserName`/`PlayerName`/`CountryName` icon components.
 4. Draft standby screen (admin-editable text) + admin draft entry & lock.
-5. Knockout views (today's teams w/ custom icons, stats, overall leaderboard) + knockout scoring + admin score entry.
+5. Knockout views (today's teams w/ custom icons, stats, overall leaderboard) + **per-user flag theming** (§11.3) + knockout scoring + admin score entry.
 6. Side pots + penalty-event scoring (manual entry) + payouts summary.
+7. Push notifications for the prediction-deadline countdown (§12b).
+8. App-wide light/dark mode toggle (§11.7) — semantic tokens, no-flash SSR, AA in both modes.
+
+> Throughout: enforce the §11.5 accessibility rule (WCAG AA, nothing ever washes out) and the
+> §11.6 tap-target minimums on every screen.
