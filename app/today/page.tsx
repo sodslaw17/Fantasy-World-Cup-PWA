@@ -9,7 +9,7 @@ import {
   type EffPickForDisplay,
   type CommentaryData,
 } from "@/components/today/TodayView";
-import type { Match, Prediction, Settings, CommentaryStatus } from "@/lib/db";
+import type { Match, Prediction, Settings, CommentaryStatus, SassLevel } from "@/lib/db";
 import { isAdmin } from "@/lib/auth/roles";
 
 export const metadata = { title: "Today — WC26 Pool" };
@@ -59,6 +59,7 @@ export default async function TodayPage() {
     { data: settings },
     { data: allDrafts },
     { data: rawEffPicks },
+    { data: commentaryConfig },
   ] = await Promise.all([
     service
       .from("matches")
@@ -72,6 +73,7 @@ export default async function TodayPage() {
     service.from("settings").select("prediction_deadline_utc").single(),
     service.from("drafts").select("profile_id, teams(fifa_code)"),
     service.from("efficiency_picks").select("profile_id, player_name, team_code, player_photo_url"),
+    service.from("commentary_config").select("sass_level").maybeSingle(),
   ]);
 
   const teamNames: Record<string, string> = Object.fromEntries(
@@ -145,6 +147,7 @@ export default async function TodayPage() {
   );
 
   const adminUser = isAdmin(user.email ?? "");
+  const sassLevel = ((commentaryConfig as { sass_level?: string } | null)?.sass_level ?? "medium") as SassLevel;
 
   const deadline = (settings as Settings | null)?.prediction_deadline_utc ?? null;
   const deadlinePassed = deadline ? now >= new Date(deadline) : false;
@@ -219,6 +222,7 @@ export default async function TodayPage() {
             effPicks={effPicks}
             commentary={commentary}
             myProfileId={myProfileRow?.id ?? null}
+            sassLevel={sassLevel}
           />
         </div>
       </div>

@@ -168,6 +168,23 @@ export interface MatchCommentary {
   updated_at: string;
 }
 
+export type SassLevel = "mild" | "medium" | "spicy" | "unhinged";
+
+export interface PoolNickname {
+  profile_id: string;
+  team_code: string;   // '' = user nickname; 'BRA' etc. = user+team nickname
+  nickname: string;
+  status: "generated" | "edited";
+  generated_at: string;
+  updated_at: string;
+}
+
+export interface CommentaryConfig {
+  singleton: true;
+  sass_level: SassLevel;
+  updated_at: string;
+}
+
 export interface Settings {
   singleton: true;
   prediction_deadline_utc: string;

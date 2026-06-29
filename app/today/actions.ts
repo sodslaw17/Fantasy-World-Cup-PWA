@@ -6,14 +6,20 @@ import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { isAdmin } from "@/lib/auth/roles";
 import { computeOverallLeaderboard } from "@/lib/scoring/overall";
+import {
+  computeEfficiencyLeaderboard,
+  computeDisciplineLeaderboard,
+  computeCardPoints,
+} from "@/lib/scoring/sidepots";
 import { type KnockoutMatch, type KnockoutStage } from "@/lib/scoring/knockout";
 import {
-  buildInvolvement,
-  buildEffPicksInGame,
+  buildUserMatchContext,
   buildPreGamePrompt,
   buildPostGamePrompt,
-  SYSTEM_PROMPT,
+  buildSystemPrompt,
   type CommentaryType,
+  type MatchContext,
+  type SassLevel,
 } from "@/lib/commentary";
 
 export type CommentaryActionResult = { error?: string; generated?: number };
@@ -25,14 +31,10 @@ async function requireAdmin(): Promise<void> {
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user || !isAdmin(user.email ?? "")) {
-    throw new Error("Unauthorized");
-  }
+  if (!user || !isAdmin(user.email ?? "")) throw new Error("Unauthorized");
 }
 
 // ─── Shared data fetch ─────────────────────────────────────────────────────────
-// Fetches all data needed to build a commentary prompt. Called once per action,
-// then reused across multiple match generations (e.g., "generate all").
 
 async function fetchSharedData() {
   const service = createServiceClient();
@@ -46,20 +48,21 @@ async function fetchSharedData() {
     { data: groupMatches },
     { data: groupPreds },
     { data: teams },
+    { data: allMatchStats },
+    { data: nicknames },
+    { data: commentaryConfig },
   ] = await Promise.all([
     service.from("profiles").select("id, auth_id, display_name"),
     service.from("drafts").select("profile_id, teams(fifa_code)"),
     service.from("matches").select("*").neq("stage", "group"),
     service.from("penalty_events").select("match_id, team_code, type"),
-    service.from("efficiency_picks").select("profile_id, player_name, team_code"),
-    service
-      .from("matches")
-      .select("id, home_goals, away_goals, status")
-      .eq("stage", "group"),
-    service
-      .from("predictions")
-      .select("user_id, match_id, home_goals_pred, away_goals_pred"),
+    service.from("efficiency_picks").select("profile_id, player_name, team_code, goals, assists, minutes"),
+    service.from("matches").select("id, home_goals, away_goals, status").eq("stage", "group"),
+    service.from("predictions").select("user_id, match_id, home_goals_pred, away_goals_pred"),
     service.from("teams").select("fifa_code, name"),
+    service.from("match_stats").select("match_id, team_code, yellows, second_yellows, straight_reds"),
+    service.from("pool_nicknames").select("profile_id, team_code, nickname"),
+    service.from("commentary_config").select("sass_level").maybeSingle(),
   ]);
 
   const teamNames: Record<string, string> = Object.fromEntries(
@@ -70,7 +73,6 @@ async function fetchSharedData() {
     (profiles ?? []).map((p) => [p.id, p.display_name]),
   );
 
-  // Normalize drafts: { profile_id, team_code }
   const drafts = (rawDrafts ?? [])
     .map((d) => {
       const t = Array.isArray(d.teams) ? d.teams[0] : d.teams;
@@ -81,7 +83,6 @@ async function fetchSharedData() {
     })
     .filter((d) => d.team_code);
 
-  // draftsByTeam: teamCode → { profileId, displayName }
   const draftsByTeam: Record<string, { profileId: string; displayName: string }> = {};
   for (const d of drafts) {
     const name = profileById[d.profile_id];
@@ -90,93 +91,189 @@ async function fetchSharedData() {
 
   const koMatches = (allKOMatches ?? []) as KnockoutMatch[];
 
-  // Compute standings using ALL current data (reflects any just-entered results)
   const standings = computeOverallLeaderboard(
     (profiles ?? []) as { id: string; auth_id: string | null; display_name: string }[],
-    (groupMatches ?? []) as {
-      id: string;
-      home_goals: number | null;
-      away_goals: number | null;
-      status: string;
-    }[],
-    (groupPreds ?? []) as {
-      user_id: string;
-      match_id: string;
-      home_goals_pred: number;
-      away_goals_pred: number;
-    }[],
+    (groupMatches ?? []) as { id: string; home_goals: number | null; away_goals: number | null; status: string }[],
+    (groupPreds ?? []) as { user_id: string; match_id: string; home_goals_pred: number; away_goals_pred: number }[],
     drafts,
     koMatches,
     (penaltyEvents ?? []) as { match_id: string; team_code: string; type: "off_target" | "panenka_fail" | "panenka_score" }[],
   );
 
-  const effPicks = (allEffPicks ?? []).map((ep) => ({
-    profileId: ep.profile_id as string,
-    displayName: profileById[ep.profile_id as string] ?? "Unknown",
-    playerName: ep.player_name as string,
-    teamCode: ep.team_code as string | null,
+  // Efficiency leaderboard (only picks with a team_code)
+  const effInputs = (allEffPicks ?? [])
+    .filter((ep) => ep.team_code)
+    .map((ep) => ({
+      profileId: ep.profile_id as string,
+      displayName: profileById[ep.profile_id as string] ?? "Unknown",
+      playerName: ep.player_name as string,
+      teamCode: ep.team_code as string,
+      goals: (ep.goals as number) ?? 0,
+      assists: (ep.assists as number) ?? 0,
+      minutes: (ep.minutes as number) ?? 0,
+    }));
+  const rawEffBoard = computeEfficiencyLeaderboard(effInputs);
+  const effLeader = rawEffBoard[0];
+  const effBoard = rawEffBoard.map((e) => ({
+    ...e,
+    gapToLeader: e.rank === 1 ? null : Math.round((effLeader.efficiency - e.efficiency) * 10000) / 10000,
+    leaderName: e.rank === 1 ? null : (effLeader.displayName as string),
   }));
+  const effByTeam: Record<string, (typeof effBoard)[number]> = {};
+  for (const e of effBoard) {
+    if (e.teamCode) effByTeam[e.teamCode] = e;
+  }
 
-  return { teamNames, draftsByTeam, standings, effPicks, koMatches };
+  // Discipline leaderboard
+  const discLeaderboard = computeDisciplineLeaderboard(
+    (profiles ?? []) as { id: string; display_name: string; auth_id: string | null }[],
+    drafts,
+    (allMatchStats ?? []) as { team_code: string; yellows: number; second_yellows: number; straight_reds: number }[],
+  );
+  const discByProfile: Record<string, (typeof discLeaderboard)[number]> = {};
+  for (const d of discLeaderboard) discByProfile[d.profileId] = d;
+
+  // Nicknames: profileId → { user, teams }
+  const nicknameMap: Record<string, { user: string | null; teams: Record<string, string> }> = {};
+  for (const n of nicknames ?? []) {
+    const pid = n.profile_id as string;
+    const code = (n.team_code as string) ?? "";
+    if (!nicknameMap[pid]) nicknameMap[pid] = { user: null, teams: {} };
+    if (code === "") nicknameMap[pid].user = n.nickname as string;
+    else nicknameMap[pid].teams[code] = n.nickname as string;
+  }
+
+  const sassLevel = ((commentaryConfig?.sass_level as SassLevel | null) ?? "medium") as SassLevel;
+
+  return {
+    teamNames, draftsByTeam, standings, koMatches,
+    effByTeam, discLeaderboard, discByProfile,
+    nicknameMap, sassLevel,
+    allMatchStats: (allMatchStats ?? []) as {
+      match_id: string; team_code: string;
+      yellows: number; second_yellows: number; straight_reds: number;
+    }[],
+  };
 }
 
+// ─── Build MatchContext ────────────────────────────────────────────────────────
 
-// ─── Pre-game generation ───────────────────────────────────────────────────────
+type RawMatch = {
+  id: string; stage: string;
+  home_team_code: string | null; away_team_code: string | null;
+  kickoff_utc: string;
+  home_goals: number | null; away_goals: number | null;
+  went_to_shootout: boolean; shootout_winner: string | null;
+  status: string;
+};
+
+function buildMatchContext(
+  match: RawMatch,
+  shared: Awaited<ReturnType<typeof fetchSharedData>>,
+  matchCardStats?: { team_code: string; yellows: number; second_yellows: number; straight_reds: number }[],
+): MatchContext {
+  const { teamNames, draftsByTeam, standings, effByTeam, discLeaderboard, discByProfile, nicknameMap, sassLevel } = shared;
+
+  const homeCode = match.home_team_code;
+  const awayCode = match.away_team_code;
+
+  let finishedMatch: KnockoutMatch | null = null;
+  if (match.status === "finished" && match.home_goals !== null && match.away_goals !== null) {
+    finishedMatch = {
+      id: match.id,
+      stage: match.stage as KnockoutStage,
+      home_team_code: homeCode,
+      away_team_code: awayCode,
+      home_goals: match.home_goals,
+      away_goals: match.away_goals,
+      went_to_shootout: match.went_to_shootout,
+      shootout_winner: match.shootout_winner as "home" | "away" | null,
+      status: match.status,
+    };
+  }
+
+  const users: MatchContext["users"] = [];
+
+  for (const [side, code] of [["home", homeCode], ["away", awayCode]] as const) {
+    if (!code) continue;
+    const drafter = draftsByTeam[code];
+    if (!drafter) continue;
+
+    const nickEntry = nicknameMap[drafter.profileId];
+
+    users.push(
+      buildUserMatchContext({
+        profileId: drafter.profileId,
+        displayName: drafter.displayName,
+        nickname: nickEntry?.user ?? null,
+        teamCode: code,
+        teamName: teamNames[code] ?? code,
+        teamNickname: nickEntry?.teams[code] ?? null,
+        side: side as "home" | "away",
+        stage: match.stage,
+        standings,
+        effEntry: effByTeam[code] ?? null,
+        discEntry: discByProfile[drafter.profileId] ?? null,
+        discLeaderboard,
+        finishedMatch,
+      }),
+    );
+  }
+
+  // Result (post-game)
+  let result: MatchContext["result"] | undefined;
+  if (finishedMatch && matchCardStats) {
+    const hS = matchCardStats.find((s) => s.team_code === homeCode);
+    const aS = matchCardStats.find((s) => s.team_code === awayCode);
+    result = {
+      homeGoals: finishedMatch.home_goals,
+      awayGoals: finishedMatch.away_goals,
+      wentToShootout: finishedMatch.went_to_shootout,
+      penWinner: finishedMatch.shootout_winner,
+      homeCardPts: hS ? computeCardPoints(hS.yellows, hS.second_yellows, hS.straight_reds) : 0,
+      awayCardPts: aS ? computeCardPoints(aS.yellows, aS.second_yellows, aS.straight_reds) : 0,
+      homeYellows: hS?.yellows ?? 0,
+      homeRedCards: (hS?.second_yellows ?? 0) + (hS?.straight_reds ?? 0),
+      awayYellows: aS?.yellows ?? 0,
+      awayRedCards: (aS?.second_yellows ?? 0) + (aS?.straight_reds ?? 0),
+    };
+  }
+
+  return {
+    matchId: match.id,
+    homeTeamName: teamNames[homeCode ?? ""] ?? homeCode ?? "TBD",
+    awayTeamName: teamNames[awayCode ?? ""] ?? awayCode ?? "TBD",
+    stage: match.stage,
+    kickoffUtc: match.kickoff_utc,
+    sassLevel,
+    users,
+    allStandings: standings.map((s) => ({
+      rank: s.rank,
+      displayName: s.displayName,
+      nickname: nicknameMap[s.profileId]?.user ?? null,
+      totalPoints: s.totalPoints,
+    })),
+    result,
+  };
+}
+
+// ─── Pre-game ──────────────────────────────────────────────────────────────────
 
 export async function generatePreGame(matchId: string): Promise<CommentaryActionResult> {
   try {
     await requireAdmin();
     const service = createServiceClient();
-    const { teamNames, draftsByTeam, standings, effPicks } = await fetchSharedData();
-
-    const { data: match } = await service
-      .from("matches")
-      .select("*")
-      .eq("id", matchId)
-      .single();
+    const shared = await fetchSharedData();
+    const { data: match } = await service.from("matches").select("*").eq("id", matchId).single();
     if (!match) return { error: "Match not found" };
 
-    const involvement = buildInvolvement(
-      match.home_team_code,
-      match.away_team_code,
-      match.stage,
-      null, // pre-game: no scoring yet
-      draftsByTeam,
-      standings,
-      teamNames,
-    );
-    const effPicksInGame = buildEffPicksInGame(
-      match.home_team_code,
-      match.away_team_code,
-      effPicks,
-      teamNames,
-    );
-
-    const homeTeamName = teamNames[match.home_team_code ?? ""] ?? match.home_team_code ?? "TBD";
-    const awayTeamName = teamNames[match.away_team_code ?? ""] ?? match.away_team_code ?? "TBD";
-
-    const prompt = buildPreGamePrompt(
-      homeTeamName,
-      awayTeamName,
-      match.stage,
-      match.kickoff_utc,
-      involvement,
-      effPicksInGame,
-      standings,
-    );
-
-    const text = await generateCommentary(SYSTEM_PROMPT, prompt);
+    const ctx = buildMatchContext(match as RawMatch, shared);
+    const text = await generateCommentary(buildSystemPrompt(shared.sassLevel), buildPreGamePrompt(ctx));
 
     await service.from("match_commentary").upsert(
-      {
-        match_id: matchId,
-        pregame_text: text,
-        pregame_status: "generated",
-        pregame_generated_at: new Date().toISOString(),
-      },
+      { match_id: matchId, pregame_text: text, pregame_status: "generated", pregame_generated_at: new Date().toISOString() },
       { onConflict: "match_id" },
     );
-
     revalidatePath("/today");
     return { generated: 1 };
   } catch (err) {
@@ -185,98 +282,35 @@ export async function generatePreGame(matchId: string): Promise<CommentaryAction
   }
 }
 
-// ─── Post-game generation ──────────────────────────────────────────────────────
+// ─── Post-game ─────────────────────────────────────────────────────────────────
 
 export async function generatePostGame(matchId: string): Promise<CommentaryActionResult> {
   try {
     await requireAdmin();
     const service = createServiceClient();
-    const { teamNames, draftsByTeam, standings, effPicks, koMatches } =
-      await fetchSharedData();
-
-    const { data: match } = await service
-      .from("matches")
-      .select("*")
-      .eq("id", matchId)
-      .single();
+    const shared = await fetchSharedData();
+    const { data: match } = await service.from("matches").select("*").eq("id", matchId).single();
     if (!match) return { error: "Match not found" };
-    if (match.status !== "finished") return { error: "Match is not finished yet" };
-    if (match.home_goals === null || match.away_goals === null) {
-      return { error: "Match goals not entered yet" };
-    }
+    if (match.status !== "finished") return { error: "Match not finished yet" };
+    if (match.home_goals === null || match.away_goals === null) return { error: "Goals not entered" };
 
-    // Fetch card stats for this match
     const { data: matchStats } = await service
       .from("match_stats")
       .select("team_code, yellows, second_yellows, straight_reds")
       .eq("match_id", matchId);
 
-    const cardStats = (matchStats ?? []).map((ms) => ({
-      teamCode: ms.team_code as string,
-      teamName: teamNames[ms.team_code as string] ?? (ms.team_code as string),
-      yellows: (ms.yellows as number) ?? 0,
-      secondYellows: (ms.second_yellows as number) ?? 0,
-      straightReds: (ms.straight_reds as number) ?? 0,
-    }));
-
-    // Cast to KnockoutMatch for scoring — goals are confirmed non-null above
-    const km: KnockoutMatch = {
-      id: match.id,
-      stage: match.stage as KnockoutStage,
-      home_team_code: match.home_team_code,
-      away_team_code: match.away_team_code,
-      home_goals: match.home_goals,
-      away_goals: match.away_goals,
-      went_to_shootout: match.went_to_shootout,
-      shootout_winner: match.shootout_winner as "home" | "away" | null,
-      status: match.status,
-    };
-
-    const involvement = buildInvolvement(
-      match.home_team_code,
-      match.away_team_code,
-      match.stage,
-      km,
-      draftsByTeam,
-      standings,
-      teamNames,
-    );
-    const effPicksInGame = buildEffPicksInGame(
-      match.home_team_code,
-      match.away_team_code,
-      effPicks,
-      teamNames,
+    const ctx = buildMatchContext(
+      match as RawMatch,
+      shared,
+      (matchStats ?? []) as { team_code: string; yellows: number; second_yellows: number; straight_reds: number }[],
     );
 
-    const homeTeamName = teamNames[match.home_team_code ?? ""] ?? match.home_team_code ?? "TBD";
-    const awayTeamName = teamNames[match.away_team_code ?? ""] ?? match.away_team_code ?? "TBD";
-
-    const prompt = buildPostGamePrompt(
-      homeTeamName,
-      awayTeamName,
-      match.stage,
-      match.home_goals,
-      match.away_goals,
-      match.went_to_shootout,
-      match.shootout_winner,
-      involvement,
-      effPicksInGame,
-      standings,
-      cardStats,
-    );
-
-    const text = await generateCommentary(SYSTEM_PROMPT, prompt);
+    const text = await generateCommentary(buildSystemPrompt(shared.sassLevel), buildPostGamePrompt(ctx));
 
     await service.from("match_commentary").upsert(
-      {
-        match_id: matchId,
-        postgame_text: text,
-        postgame_status: "generated",
-        postgame_generated_at: new Date().toISOString(),
-      },
+      { match_id: matchId, postgame_text: text, postgame_status: "generated", postgame_generated_at: new Date().toISOString() },
       { onConflict: "match_id" },
     );
-
     revalidatePath("/today");
     return { generated: 1 };
   } catch (err) {
@@ -285,28 +319,21 @@ export async function generatePostGame(matchId: string): Promise<CommentaryActio
   }
 }
 
-// ─── Generate all pending post-game recaps ─────────────────────────────────────
-// Client passes IDs of today's finished knockout matches without a post-game recap.
+// ─── Bulk generate ─────────────────────────────────────────────────────────────
 
-export async function generateAllPendingRecaps(
-  matchIds: string[],
-): Promise<CommentaryActionResult> {
+export async function generateAllPendingRecaps(matchIds: string[]): Promise<CommentaryActionResult> {
   if (matchIds.length === 0) return { generated: 0 };
   try {
     await requireAdmin();
     const service = createServiceClient();
-    const { teamNames, draftsByTeam, standings, effPicks } = await fetchSharedData();
+    const shared = await fetchSharedData();
 
     let generated = 0;
     const errors: string[] = [];
 
     for (const matchId of matchIds) {
       try {
-        const { data: match } = await service
-          .from("matches")
-          .select("*")
-          .eq("id", matchId)
-          .single();
+        const { data: match } = await service.from("matches").select("*").eq("id", matchId).single();
         if (!match || match.status !== "finished" || match.home_goals === null || match.away_goals === null) continue;
 
         const { data: matchStats } = await service
@@ -314,53 +341,16 @@ export async function generateAllPendingRecaps(
           .select("team_code, yellows, second_yellows, straight_reds")
           .eq("match_id", matchId);
 
-        const cardStats = (matchStats ?? []).map((ms) => ({
-          teamCode: ms.team_code as string,
-          teamName: teamNames[ms.team_code as string] ?? (ms.team_code as string),
-          yellows: (ms.yellows as number) ?? 0,
-          secondYellows: (ms.second_yellows as number) ?? 0,
-          straightReds: (ms.straight_reds as number) ?? 0,
-        }));
-
-        const km: KnockoutMatch = {
-          id: match.id,
-          stage: match.stage as KnockoutStage,
-          home_team_code: match.home_team_code,
-          away_team_code: match.away_team_code,
-          home_goals: match.home_goals,
-          away_goals: match.away_goals,
-          went_to_shootout: match.went_to_shootout,
-          shootout_winner: match.shootout_winner as "home" | "away" | null,
-          status: match.status,
-        };
-
-        const involvement = buildInvolvement(
-          match.home_team_code, match.away_team_code, match.stage,
-          km, draftsByTeam, standings, teamNames,
-        );
-        const effPicksInGame = buildEffPicksInGame(
-          match.home_team_code, match.away_team_code, effPicks, teamNames,
+        const ctx = buildMatchContext(
+          match as RawMatch,
+          shared,
+          (matchStats ?? []) as { team_code: string; yellows: number; second_yellows: number; straight_reds: number }[],
         );
 
-        const homeTeamName = teamNames[match.home_team_code ?? ""] ?? "TBD";
-        const awayTeamName = teamNames[match.away_team_code ?? ""] ?? "TBD";
-
-        const prompt = buildPostGamePrompt(
-          homeTeamName, awayTeamName, match.stage,
-          match.home_goals, match.away_goals,
-          match.went_to_shootout, match.shootout_winner,
-          involvement, effPicksInGame, standings, cardStats,
-        );
-
-        const text = await generateCommentary(SYSTEM_PROMPT, prompt);
+        const text = await generateCommentary(buildSystemPrompt(shared.sassLevel), buildPostGamePrompt(ctx));
 
         await service.from("match_commentary").upsert(
-          {
-            match_id: matchId,
-            postgame_text: text,
-            postgame_status: "generated",
-            postgame_generated_at: new Date().toISOString(),
-          },
+          { match_id: matchId, postgame_text: text, postgame_status: "generated", postgame_generated_at: new Date().toISOString() },
           { onConflict: "match_id" },
         );
         generated++;
@@ -370,13 +360,27 @@ export async function generateAllPendingRecaps(
     }
 
     revalidatePath("/today");
-    return {
-      generated,
-      error: errors.length > 0 ? `${errors.length} failed: ${errors.join("; ")}` : undefined,
-    };
+    return { generated, error: errors.length > 0 ? `${errors.length} failed: ${errors.join("; ")}` : undefined };
   } catch (err) {
     console.error("generateAllPendingRecaps:", err);
     return { error: err instanceof Error ? err.message : "Generation failed" };
+  }
+}
+
+// ─── Sass level ────────────────────────────────────────────────────────────────
+
+export async function setSassLevel(level: SassLevel): Promise<CommentaryActionResult> {
+  try {
+    await requireAdmin();
+    const service = createServiceClient();
+    await service.from("commentary_config").upsert(
+      { singleton: true, sass_level: level, updated_at: new Date().toISOString() },
+      { onConflict: "singleton" },
+    );
+    revalidatePath("/today");
+    return {};
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : "Save failed" };
   }
 }
 
@@ -392,11 +396,7 @@ export async function saveCommentaryEdit(
     const service = createServiceClient();
     const field = type === "pregame" ? "pregame" : "postgame";
     await service.from("match_commentary").upsert(
-      {
-        match_id: matchId,
-        [`${field}_text`]: text.trim(),
-        [`${field}_status`]: "edited",
-      },
+      { match_id: matchId, [`${field}_text`]: text.trim(), [`${field}_status`]: "edited" },
       { onConflict: "match_id" },
     );
     revalidatePath("/today");
@@ -406,7 +406,7 @@ export async function saveCommentaryEdit(
   }
 }
 
-// ─── Clear / hide ──────────────────────────────────────────────────────────────
+// ─── Clear ─────────────────────────────────────────────────────────────────────
 
 export async function clearCommentary(
   matchId: string,
@@ -417,12 +417,7 @@ export async function clearCommentary(
     const service = createServiceClient();
     const field = type === "pregame" ? "pregame" : "postgame";
     await service.from("match_commentary").upsert(
-      {
-        match_id: matchId,
-        [`${field}_text`]: null,
-        [`${field}_status`]: "none",
-        [`${field}_generated_at`]: null,
-      },
+      { match_id: matchId, [`${field}_text`]: null, [`${field}_status`]: "none", [`${field}_generated_at`]: null },
       { onConflict: "match_id" },
     );
     revalidatePath("/today");

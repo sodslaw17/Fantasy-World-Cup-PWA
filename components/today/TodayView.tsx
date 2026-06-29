@@ -10,8 +10,9 @@ import {
   generateAllPendingRecaps,
   saveCommentaryEdit,
   clearCommentary,
+  setSassLevel,
 } from "@/app/today/actions";
-import type { Match } from "@/lib/db";
+import type { Match, SassLevel } from "@/lib/db";
 
 // ─── Interfaces ────────────────────────────────────────────────────────────────
 
@@ -80,6 +81,7 @@ export function TodayView({
   effPicks = [],
   commentary = {},
   myProfileId = null,
+  sassLevel = "medium",
 }: {
   matches: TodayMatch[];
   draftsByTeam?: Record<string, DrafterInfo>;
@@ -87,10 +89,13 @@ export function TodayView({
   effPicks?: EffPickForDisplay[];
   commentary?: Record<string, CommentaryData>;
   myProfileId?: string | null;
+  sassLevel?: SassLevel;
 }) {
   const router = useRouter();
   const [bulkGenerating, setBulkGenerating] = React.useState(false);
   const [bulkResult, setBulkResult] = React.useState<string | null>(null);
+  const [currentSass, setCurrentSass] = React.useState<SassLevel>(sassLevel);
+  const [sassUpdating, setSassUpdating] = React.useState(false);
 
   if (matches.length === 0) {
     return (
@@ -125,24 +130,56 @@ export function TodayView({
     router.refresh();
   }
 
+  async function handleSassChange(level: SassLevel) {
+    setSassUpdating(true);
+    setCurrentSass(level);
+    await setSassLevel(level);
+    setSassUpdating(false);
+    router.refresh();
+  }
+
   return (
     <>
-      {/* Admin "generate all" button — only shown when there are pending recaps */}
-      {isAdmin && pendingRecapIds.length > 0 && (
-        <div className="flex items-center gap-2 px-1">
-          <button
-            onClick={handleGenerateAll}
-            disabled={bulkGenerating}
-            className="flex-1 text-[12px] font-semibold py-2 px-3 rounded-lg bg-brand text-brand-on disabled:opacity-50"
-          >
-            {bulkGenerating
-              ? "Generating recaps…"
-              : `Generate all pending recaps (${pendingRecapIds.length})`}
-          </button>
+      {/* Admin controls: sass dial + bulk generate */}
+      {isAdmin && (
+        <div className="flex flex-col gap-1.5 px-1">
+          {/* Sass dial */}
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] uppercase tracking-widest text-ink-3 font-bold shrink-0">Sass</span>
+            <div className="flex gap-1">
+              {(["mild", "medium", "spicy", "unhinged"] as SassLevel[]).map((level) => (
+                <button
+                  key={level}
+                  onClick={() => handleSassChange(level)}
+                  disabled={sassUpdating}
+                  className={[
+                    "text-[10px] font-semibold px-2 py-0.5 rounded capitalize",
+                    currentSass === level
+                      ? "bg-brand text-brand-on"
+                      : "bg-paper-3 text-ink-2",
+                  ].join(" ")}
+                >
+                  {level}
+                </button>
+              ))}
+            </div>
+            {sassUpdating && <span className="text-[10px] text-ink-3">saving…</span>}
+          </div>
+
+          {pendingRecapIds.length > 0 && (
+            <button
+              onClick={handleGenerateAll}
+              disabled={bulkGenerating}
+              className="text-[12px] font-semibold py-2 px-3 rounded-lg bg-brand text-brand-on disabled:opacity-50 text-left"
+            >
+              {bulkGenerating
+                ? "Generating recaps…"
+                : `Generate all pending recaps (${pendingRecapIds.length})`}
+            </button>
+          )}
+
+          {bulkResult && <p className="text-[11px] text-ink-2">{bulkResult}</p>}
         </div>
-      )}
-      {isAdmin && bulkResult && (
-        <p className="text-[11px] text-ink-2 px-1">{bulkResult}</p>
       )}
 
       {matches.map((match) => (
