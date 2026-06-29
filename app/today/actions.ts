@@ -1,6 +1,6 @@
 "use server";
 
-import Anthropic from "@anthropic-ai/sdk";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
@@ -120,19 +120,16 @@ async function fetchSharedData() {
   return { teamNames, draftsByTeam, standings, effPicks, koMatches };
 }
 
-// ─── Claude caller ─────────────────────────────────────────────────────────────
+// ─── Gemini caller ─────────────────────────────────────────────────────────────
 
-async function callClaude(prompt: string): Promise<string> {
-  const client = new Anthropic();
-  const msg = await client.messages.create({
-    model: "claude-haiku-4-5-20251001",
-    max_tokens: 400,
-    system: SYSTEM_PROMPT,
-    messages: [{ role: "user", content: prompt }],
+async function callGemini(prompt: string): Promise<string> {
+  const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
+  const model = genAI.getGenerativeModel({
+    model: "gemini-2.0-flash",
+    systemInstruction: SYSTEM_PROMPT,
   });
-  const block = msg.content[0];
-  if (block.type !== "text") throw new Error("Unexpected response type from Claude");
-  return block.text.trim();
+  const result = await model.generateContent(prompt);
+  return result.response.text().trim();
 }
 
 // ─── Pre-game generation ───────────────────────────────────────────────────────
@@ -179,7 +176,7 @@ export async function generatePreGame(matchId: string): Promise<CommentaryAction
       standings,
     );
 
-    const text = await callClaude(prompt);
+    const text = await callGemini(prompt);
 
     await service.from("match_commentary").upsert(
       {
@@ -279,7 +276,7 @@ export async function generatePostGame(matchId: string): Promise<CommentaryActio
       cardStats,
     );
 
-    const text = await callClaude(prompt);
+    const text = await callGemini(prompt);
 
     await service.from("match_commentary").upsert(
       {
@@ -366,7 +363,7 @@ export async function generateAllPendingRecaps(
           involvement, effPicksInGame, standings, cardStats,
         );
 
-        const text = await callClaude(prompt);
+        const text = await callGemini(prompt);
 
         await service.from("match_commentary").upsert(
           {
