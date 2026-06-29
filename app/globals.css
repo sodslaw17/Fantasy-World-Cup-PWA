@@ -1,34 +1,228 @@
+/* ============================================================
+   WC2026 Fantasy — globals.css
+   CANONICAL DESIGN TOKENS  ·  Tailwind v4  ·  TRIONDA system
+   ------------------------------------------------------------
+   This file is the single source of truth for every token.
+   No component may hard-code a hex value — everything resolves
+   through a token defined here and exposed as a Tailwind utility
+   via the `@theme inline` block at the bottom.
+   ============================================================ */
+
 @import "tailwindcss";
 
-/* FIFA World Cup 2026 design tokens — adjust hex values here to retheme */
-@theme {
-  /* Core palette */
-  --color-gold: #C8A24B;
-  --color-gold-light: #E0C278;
-  --color-gold-dark: #A07830;
-  --color-ink: #0B0B0B;
-  --color-ink-soft: #1A1A1A;
-  --color-paper: #FFFFFF;
+/* Dark mode is attribute-driven (data-base="dark") so the prototype's
+   Tweaks switch and the production theme store use the same selector.
+   This makes `dark:` utilities respond to [data-base="dark"]. */
+@custom-variant dark (&:where([data-base="dark"], [data-base="dark"] *));
 
-  /* Tri-host accent colours */
-  --color-accent-red: #E4002B;
-  --color-accent-blue: #0A3D91;
-  --color-accent-green: #008A52;
+/* ------------------------------------------------------------
+   FONTS
+   next/font injects --font-hanken, --font-saira, --font-saira-condensed
+   as CSS custom properties on <html>. The tokens below then reference
+   those vars so Tailwind utilities (font-body, font-display, font-num)
+   resolve to the self-hosted faces with zero layout shift.
+------------------------------------------------------------ */
 
-  /* Tap-target baseline: 48px minimum for mobile */
-  --spacing-tap: 48px;
+:root {
+  /* ---- type ---- */
+  --font-body:    var(--font-hanken), system-ui, -apple-system, sans-serif;
+  --font-display: var(--font-saira-condensed), "Hanken Grotesk", sans-serif;
+  --font-num:     var(--font-saira), "Hanken Grotesk", sans-serif;
 
-  --font-sans: system-ui, -apple-system, sans-serif;
+  /* ---- neutral base (FIXED — never themed per-user) ---- */
+  --paper:   #FFFFFF;   /* app background base            */
+  --paper-2: #F5F6F9;   /* subtle raised fill / zebra rows */
+  --paper-3: #ECEEF3;   /* inset / chip fill              */
+  --surface: #FFFFFF;   /* card surface                   */
+  --stage:   #EAECF1;   /* canvas BEHIND the app/phone — REQUIRED, do not drop */
+  --ink:   #14151A;     /* primary text     */
+  --ink-2: #565D6E;     /* secondary text   */
+  --ink-3: #8A90A0;     /* tertiary / muted */
+  --line:   #E4E7ED;    /* hairline borders          */
+  --line-2: #D3D7E0;    /* stronger borders / control outlines */
+
+  /* ---- host accents (red / green / blue) ---- */
+  --red:      #E4002B;  --red-ink:   #C10024;  --red-soft:   #FDEAEE;
+  --blue:     #0A3D91;  --blue-ink:  #0A3D91;  --blue-soft:  #E7EDF7;
+  --green:    #008A52;  --green-ink: #007444;  --green-soft: #E2F2EB;
+
+  /* ---- gold (trophy / winner / payout ONLY — never general UI) ---- */
+  --gold:      #C8A24B; --gold-ink:  #8A6D1E;  --gold-soft:  #F8F1DE; --gold-line: #E7D49B;
+
+  /* ---- semantic (prediction result & status) ---- */
+  --good: #007444;  /* exact scoreline (green)       */
+  --bad:  #C10024;  /* wrong (red)                   */
+  --warn: #9A6B00;  /* correct outcome only (amber)  */
+
+  /* ---- BRAND layer (themeable) ----
+     Default = host blue. In knockout these are OVERWRITTEN at runtime
+     by an inline style on the app-root wrapper (see computeBrand in
+     lib/theme.ts). Never read a raw flag color directly — read these. */
+  --brand:      var(--blue);
+  --brand-ink:  #0A3D91;   /* brand as TEXT on surface (AA-safe)        */
+  --brand-on:   #FFFFFF;   /* text/icon sitting ON a --brand fill       */
+  --brand-soft: #D1DDEE;   /* stronger than old blue-soft (20% brand)   */
+  --brand-2:    var(--red);
+  --brand-2-ink: var(--red-ink);
+  /* Bold-theming surfaces — derived from brand primary in HSL-space.
+     Light: near-white tinted surfaces. Dark: deep rich team fills.
+     Default values match computeBrand("#0A3D91", …, "light"). */
+  --brand-header:    #C9DBF7;   /* header/nav bg — strongly hued           */
+  --brand-header-on: #14151A;   /* text/icon ON the header (auto contrast) */
+  --brand-wash:      #E8F0FB;   /* card/section wash                       */
+  --brand-tint:      #F4F7FD;   /* page/scroll background tint             */
+
+  /* ---- radii ---- */
+  --r-xs: 8px; --r-sm: 12px; --r-md: 16px; --r-lg: 22px; --r-xl: 28px; --r-pill: 999px;
+
+  /* ---- shadows ---- */
+  --shadow-sm: 0 1px 2px rgba(20,21,26,.06), 0 1px 3px rgba(20,21,26,.05);
+  --shadow-md: 0 4px 14px rgba(20,21,26,.07), 0 2px 5px rgba(20,21,26,.05);
+  --shadow-lg: 0 14px 40px rgba(20,21,26,.12), 0 4px 12px rgba(20,21,26,.07);
+  --shadow-gold: 0 8px 26px rgba(200,162,75,.30);
+
+  /* ---- spacing scale ---- */
+  --s1: 4px; --s2: 8px; --s3: 12px; --s4: 16px; --s5: 20px; --s6: 24px; --s7: 32px; --s8: 40px;
+
+  /* ---- tap target (HARD FLOOR — every control ≥ 44×44) ---- */
+  --tap: 44px;
+
+  /* ---- flag backdrop (dark mode — ambient team flag behind scroll area) ----
+     --flag-opacity : img opacity (0–1). Higher = more visible flag.
+     --flag-blur    : blur radius. Higher = softer/more abstract. */
+  --flag-opacity: 0.92;
+  --flag-blur:    18px;
+
+  /* ---- logo backdrop (light mode — team crest centered watermark) ----
+     --logo-opacity : lower than flag; crests are emblems not full-bleed fills.
+     --logo-blur    : slight softening only — enough to feel ambient, not decorative. */
+  --logo-opacity: 0.18;
+  --logo-blur:    4px;
 }
 
-/* Base dark-mode body */
-html {
-  background-color: theme(--color-ink);
-  color: theme(--color-paper);
-  -webkit-font-smoothing: antialiased;
+/* ------------------------------------------------------------
+   DARK BASE — only the neutral + soft + shadow values flip.
+   Accents/gold/semantic hold; brand still recomputed at runtime.
+------------------------------------------------------------ */
+[data-base="dark"] {
+  --paper:   #0E0F13;
+  --paper-2: #16181F;
+  --paper-3: #1E212B;
+  --surface: #16181F;
+  --stage:   #0A0B0E;
+  --ink:   #F4F5F7;
+  --ink-2: #A7ADBC;
+  --ink-3: #71768A;
+  --line:   #262A35;
+  --line-2: #333845;
+
+  --red-soft:   #2A1217;
+  --blue-soft:  #111B30;
+  --green-soft: #0E2018;
+  --gold-soft:  #241E10;
+
+  --shadow-sm: 0 1px 2px rgba(0,0,0,.40), 0 1px 3px rgba(0,0,0,.40);
+  --shadow-md: 0 4px 14px rgba(0,0,0,.45), 0 2px 5px rgba(0,0,0,.40);
+  --shadow-lg: 0 14px 40px rgba(0,0,0,.55), 0 4px 12px rgba(0,0,0,.45);
+
+  /* Flag backdrop — slightly lower opacity in dark mode; dark surfaces absorb more */
+  --flag-opacity: 0.78;
+
+  /* Bold-theming dark defaults — match computeBrand("#0A3D91", …, "dark") */
+  --brand-soft:      #1B2E44;
+  --brand-header:    #0A2D65;
+  --brand-header-on: #FFFFFF;
+  --brand-wash:      #091B3E;
+  --brand-tint:      #060E21;
 }
 
-/* Ensure safe-area padding on notched devices */
-body {
-  padding-bottom: env(safe-area-inset-bottom);
+/* ------------------------------------------------------------
+   PER-USER FLAG THEMES (knockout)
+   In production, call computeBrand(theme_primary_hex, theme_secondary_hex, base)
+   from lib/theme.ts and set the result as an inline style on the app-root wrapper.
+   These blocks are AA-verified examples only.
+------------------------------------------------------------ */
+[data-flag="ar"] { --brand:#6CA6DC; --brand-ink:#1E6FB8; --brand-on:#0A2A44; --brand-soft:#E9F2FA; --brand-2:#F2B33D; --brand-2-ink:#92670A; }
+[data-flag="de"] { --brand:#1A1A1A; --brand-ink:#1A1A1A; --brand-on:#FFFFFF; --brand-soft:#ECECEE; --brand-2:#D80027; --brand-2-ink:#C10024; }
+[data-flag="mx"] { --brand:#006847; --brand-ink:#00643F; --brand-on:#FFFFFF; --brand-soft:#E1F0E9; --brand-2:#CE1126; --brand-2-ink:#BC1020; }
+[data-flag="br"] { --brand:#009C3B; --brand-ink:#007E30; --brand-on:#FFFFFF; --brand-soft:#E2F4E8; --brand-2:#1C3FAA; --brand-2-ink:#1C3FAA; }
+
+/* ------------------------------------------------------------
+   @theme inline — surface the tokens above as Tailwind utilities.
+   `inline` means utilities resolve to var(--token) at runtime, so
+   dark-mode and per-user brand overrides flow through automatically.
+------------------------------------------------------------ */
+@theme inline {
+  --font-body:    var(--font-body);
+  --font-display: var(--font-display);
+  --font-num:     var(--font-num);
+
+  --color-paper:   var(--paper);
+  --color-paper-2: var(--paper-2);
+  --color-paper-3: var(--paper-3);
+  --color-surface: var(--surface);
+  --color-stage:   var(--stage);
+  --color-ink:   var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-ink-3: var(--ink-3);
+  --color-line:   var(--line);
+  --color-line-2: var(--line-2);
+
+  --color-red:   var(--red);   --color-red-ink:   var(--red-ink);   --color-red-soft:   var(--red-soft);
+  --color-blue:  var(--blue);  --color-blue-ink:  var(--blue-ink);  --color-blue-soft:  var(--blue-soft);
+  --color-green: var(--green); --color-green-ink: var(--green-ink); --color-green-soft: var(--green-soft);
+  --color-gold:  var(--gold);  --color-gold-ink:  var(--gold-ink);  --color-gold-soft:  var(--gold-soft); --color-gold-line: var(--gold-line);
+
+  --color-good: var(--good);
+  --color-bad:  var(--bad);
+  --color-warn: var(--warn);
+
+  --color-brand:          var(--brand);
+  --color-brand-ink:      var(--brand-ink);
+  --color-brand-on:       var(--brand-on);
+  --color-brand-soft:     var(--brand-soft);
+  --color-brand-2:        var(--brand-2);
+  --color-brand-2-ink:    var(--brand-2-ink);
+  --color-brand-header:    var(--brand-header);
+  --color-brand-header-on: var(--brand-header-on);
+  --color-brand-wash:      var(--brand-wash);
+  --color-brand-tint:      var(--brand-tint);
+
+  --radius-xs: var(--r-xs);
+  --radius-sm: var(--r-sm);
+  --radius-md: var(--r-md);
+  --radius-lg: var(--r-lg);
+  --radius-xl: var(--r-xl);
+  --radius-pill: var(--r-pill);
+
+  --shadow-sm: var(--shadow-sm);
+  --shadow-md: var(--shadow-md);
+  --shadow-lg: var(--shadow-lg);
+  --shadow-gold: var(--shadow-gold);
+
+  /* ---- backwards-compat aliases for admin components (remove after full port) ---- */
+  --color-admin-bg:     var(--surface);
+  --color-admin-ink:    var(--ink);
+  --color-admin-soft:   var(--paper-2);
+  --color-admin-border: var(--line);
+  --color-admin-muted:  var(--ink-2);
+  --color-accent-red:   var(--red);
+  --color-accent-blue:  var(--blue);
+  --color-accent-green: var(--green);
+}
+
+/* ------------------------------------------------------------
+   BASE LAYER
+------------------------------------------------------------ */
+@layer base {
+  html, body { margin: 0; }
+  body {
+    font-family: var(--font-body);
+    background: var(--stage);
+    color: var(--ink);
+    -webkit-font-smoothing: antialiased;
+    line-height: 1.5;
+  }
+  .tabular { font-variant-numeric: tabular-nums; }
+  .wc-scroll > * { flex-shrink: 0; }
 }
