@@ -1,6 +1,6 @@
 "use server";
 
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { generateCommentary } from "@/lib/llm";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
@@ -120,17 +120,6 @@ async function fetchSharedData() {
   return { teamNames, draftsByTeam, standings, effPicks, koMatches };
 }
 
-// ─── Gemini caller ─────────────────────────────────────────────────────────────
-
-async function callGemini(prompt: string): Promise<string> {
-  const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
-  const model = genAI.getGenerativeModel({
-    model: "gemini-2.0-flash",
-    systemInstruction: SYSTEM_PROMPT,
-  });
-  const result = await model.generateContent(prompt);
-  return result.response.text().trim();
-}
 
 // ─── Pre-game generation ───────────────────────────────────────────────────────
 
@@ -176,7 +165,7 @@ export async function generatePreGame(matchId: string): Promise<CommentaryAction
       standings,
     );
 
-    const text = await callGemini(prompt);
+    const text = await generateCommentary(SYSTEM_PROMPT, prompt);
 
     await service.from("match_commentary").upsert(
       {
@@ -276,7 +265,7 @@ export async function generatePostGame(matchId: string): Promise<CommentaryActio
       cardStats,
     );
 
-    const text = await callGemini(prompt);
+    const text = await generateCommentary(SYSTEM_PROMPT, prompt);
 
     await service.from("match_commentary").upsert(
       {
@@ -363,7 +352,7 @@ export async function generateAllPendingRecaps(
           involvement, effPicksInGame, standings, cardStats,
         );
 
-        const text = await callGemini(prompt);
+        const text = await generateCommentary(SYSTEM_PROMPT, prompt);
 
         await service.from("match_commentary").upsert(
           {
