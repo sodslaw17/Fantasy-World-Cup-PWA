@@ -22,11 +22,11 @@ async function callGemini(systemPrompt: string, prompt: string): Promise<string>
   return result.response.text().trim();
 }
 
-async function callAnthropic(systemPrompt: string, prompt: string): Promise<string> {
+async function callAnthropic(systemPrompt: string, prompt: string, maxTokens: number): Promise<string> {
   const client = new Anthropic();
   const msg = await client.messages.create({
     model: "claude-haiku-4-5-20251001",
-    max_tokens: 400,
+    max_tokens: maxTokens,
     system: systemPrompt,
     messages: [{ role: "user", content: prompt }],
   });
@@ -36,7 +36,7 @@ async function callAnthropic(systemPrompt: string, prompt: string): Promise<stri
 }
 
 // Groq is OpenAI-compatible — no extra SDK needed, plain fetch.
-async function callGroq(systemPrompt: string, prompt: string): Promise<string> {
+async function callGroq(systemPrompt: string, prompt: string, maxTokens: number): Promise<string> {
   const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
     method: "POST",
     headers: {
@@ -45,7 +45,7 @@ async function callGroq(systemPrompt: string, prompt: string): Promise<string> {
     },
     body: JSON.stringify({
       model: "llama-3.3-70b-versatile",
-      max_tokens: 400,
+      max_tokens: maxTokens,
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: prompt },
@@ -63,12 +63,13 @@ async function callGroq(systemPrompt: string, prompt: string): Promise<string> {
 export async function generateCommentary(
   systemPrompt: string,
   prompt: string,
+  maxTokens = 500,
 ): Promise<string> {
   const provider = (process.env.LLM_PROVIDER ?? "gemini") as Provider;
   switch (provider) {
     case "gemini":    return callGemini(systemPrompt, prompt);
-    case "anthropic": return callAnthropic(systemPrompt, prompt);
-    case "groq":      return callGroq(systemPrompt, prompt);
+    case "anthropic": return callAnthropic(systemPrompt, prompt, maxTokens);
+    case "groq":      return callGroq(systemPrompt, prompt, maxTokens);
     default:
       throw new Error(
         `Unknown LLM_PROVIDER "${provider}". Valid values: gemini, anthropic, groq`,

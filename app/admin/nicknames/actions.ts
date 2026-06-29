@@ -78,7 +78,7 @@ export async function generateAllNicknames(): Promise<{ error?: string; generate
     const systemPrompt =
       "You generate fun group-chat nicknames for a WC2026 fantasy football pool. Output valid JSON only — no explanation, no markdown, no code fences.";
 
-    const raw = await generateCommentary(systemPrompt, userPrompt);
+    const raw = await generateCommentary(systemPrompt, userPrompt, 2000);
 
     // Strip any accidental markdown fences
     const cleaned = raw.replace(/^```[\w]*\n?/m, "").replace(/```$/m, "").trim();
