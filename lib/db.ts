@@ -39,9 +39,12 @@ export interface Match {
   went_to_et: boolean;
   went_to_shootout: boolean;
   shootout_winner: ShootoutWinner | null;
-  // Bracket progression wiring (migration 011)
+  // Bracket progression wiring (migrations 011-012)
   home_feed_match_id: string | null;
   away_feed_match_id: string | null;
+  // Which outcome of the feeder advances here: 'winner' (default) or 'loser' (Bronze Final)
+  home_feed_outcome: 'winner' | 'loser';
+  away_feed_outcome: 'winner' | 'loser';
   // Auto/manual sync columns (migration 009)
   home_goals_auto: number | null;
   away_goals_auto: number | null;
@@ -149,6 +152,20 @@ export interface SyncLog {
   unmapped_players: string[];
   errors: string[];
   status: "running" | "ok" | "error" | "skipped";
+}
+
+export type CommentaryStatus = "none" | "generated" | "edited";
+
+export interface MatchCommentary {
+  match_id: string;
+  pregame_text: string | null;
+  pregame_status: CommentaryStatus;
+  pregame_generated_at: string | null;
+  postgame_text: string | null;
+  postgame_status: CommentaryStatus;
+  postgame_generated_at: string | null;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface Settings {

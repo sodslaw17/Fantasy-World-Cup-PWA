@@ -1,8 +1,15 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
-import { TodayView, type TodayMatch, type UserPrediction, type DrafterInfo } from "@/components/today/TodayView";
-import type { Match, Prediction, Settings } from "@/lib/db";
+import {
+  TodayView,
+  type TodayMatch,
+  type UserPrediction,
+  type DrafterInfo,
+  type EffPickForDisplay,
+  type CommentaryData,
+} from "@/components/today/TodayView";
+import type { Match, Prediction, Settings, CommentaryStatus } from "@/lib/db";
 import { isAdmin } from "@/lib/auth/roles";
 
 export const metadata = { title: "Today — WC26 Pool" };
@@ -51,6 +58,7 @@ export default async function TodayPage() {
     { data: profiles },
     { data: settings },
     { data: allDrafts },
+    { data: rawEffPicks },
   ] = await Promise.all([
     service
       .from("matches")
@@ -63,6 +71,7 @@ export default async function TodayPage() {
     service.from("profiles").select("id, display_name, auth_id, avatar_url"),
     service.from("settings").select("prediction_deadline_utc").single(),
     service.from("drafts").select("profile_id, teams(fifa_code)"),
+    service.from("efficiency_picks").select("profile_id, player_name, team_code, player_photo_url"),
   ]);
 
   const teamNames: Record<string, string> = Object.fromEntries(
@@ -92,6 +101,48 @@ export default async function TodayPage() {
       draftsByTeam[code] = { profileId, displayName: prof.displayName, avatarUrl: prof.avatarUrl };
     }
   }
+
+  // Build efficiency picks list for display (team_code used to detect per-match involvement)
+  const effPicks: EffPickForDisplay[] = (rawEffPicks ?? []).map((ep) => {
+    const prof = profileById[ep.profile_id as string];
+    return {
+      profileId: ep.profile_id as string,
+      displayName: prof?.displayName ?? "Unknown",
+      playerName: ep.player_name as string,
+      teamCode: ep.team_code as string | null,
+      playerPhotoUrl: (ep as { player_photo_url?: string | null }).player_photo_url ?? null,
+    };
+  });
+
+  // Fetch commentary for today's knockout matches (may not exist yet — graceful fallback)
+  const todayKOMatchIds = (todayMatches ?? [])
+    .filter((m: Match) => m.stage !== "group")
+    .map((m: Match) => m.id);
+
+  const commentaryRows =
+    todayKOMatchIds.length > 0
+      ? (
+          await service
+            .from("match_commentary")
+            .select("*")
+            .in("match_id", todayKOMatchIds)
+        ).data ?? []
+      : [];
+
+  const commentary: Record<string, CommentaryData> = Object.fromEntries(
+    commentaryRows.map((row) => [
+      row.match_id,
+      {
+        matchId: row.match_id as string,
+        pregameText: row.pregame_text as string | null,
+        pregameStatus: (row.pregame_status as CommentaryStatus) ?? "none",
+        pregameGeneratedAt: row.pregame_generated_at as string | null,
+        postgameText: row.postgame_text as string | null,
+        postgameStatus: (row.postgame_status as CommentaryStatus) ?? "none",
+        postgameGeneratedAt: row.postgame_generated_at as string | null,
+      },
+    ])
+  );
 
   const adminUser = isAdmin(user.email ?? "");
 
@@ -165,6 +216,9 @@ export default async function TodayPage() {
             matches={enrichedMatches}
             draftsByTeam={draftsByTeam}
             isAdmin={adminUser}
+            effPicks={effPicks}
+            commentary={commentary}
+            myProfileId={myProfileRow?.id ?? null}
           />
         </div>
       </div>
