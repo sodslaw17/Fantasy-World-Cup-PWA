@@ -48,43 +48,48 @@ export function DateNav({
   }
 
   return (
-    <div
-      className="flex items-center justify-between gap-1 px-2.5 pb-2.5"
-      onTouchStart={onTouchStart}
-      onTouchEnd={onTouchEnd}
-    >
-      <button
-        type="button"
-        aria-label="Previous day"
-        onClick={() => shift(-1)}
-        disabled={!canPrev}
-        className="w-11 h-11 shrink-0 flex items-center justify-center rounded-full text-ink-2 text-xl disabled:opacity-30 active:bg-paper-2"
-      >
-        ‹
-      </button>
-
-      <div className="flex-1 min-w-0 flex items-center justify-center gap-2">
-        <span className="text-[13px] font-semibold text-ink truncate">{label}</span>
-        {!isToday && (
+    <div className="flex flex-col gap-1 pb-2.5">
+      {!isToday && (
+        <div className="flex justify-center">
           <button
             type="button"
             onClick={() => go(today)}
             className="shrink-0 text-[11px] font-semibold text-brand-ink bg-brand-soft rounded-full px-2.5 py-1 min-h-[28px]"
           >
-            Today
+            ← Go back to Today
           </button>
-        )}
-      </div>
+        </div>
+      )}
 
-      <button
-        type="button"
-        aria-label="Next day"
-        onClick={() => shift(1)}
-        disabled={!canNext}
-        className="w-11 h-11 shrink-0 flex items-center justify-center rounded-full text-ink-2 text-xl disabled:opacity-30 active:bg-paper-2"
+      <div
+        className="flex items-center justify-between gap-1 px-2.5"
+        onTouchStart={onTouchStart}
+        onTouchEnd={onTouchEnd}
       >
-        ›
-      </button>
+        <button
+          type="button"
+          aria-label="Previous day"
+          onClick={() => shift(-1)}
+          disabled={!canPrev}
+          className="w-11 h-11 shrink-0 flex items-center justify-center rounded-full text-ink-2 text-xl disabled:opacity-30 active:bg-paper-2"
+        >
+          ‹
+        </button>
+
+        <span className="flex-1 min-w-0 text-center text-[13px] font-semibold text-ink truncate">
+          {label}
+        </span>
+
+        <button
+          type="button"
+          aria-label="Next day"
+          onClick={() => shift(1)}
+          disabled={!canNext}
+          className="w-11 h-11 shrink-0 flex items-center justify-center rounded-full text-ink-2 text-xl disabled:opacity-30 active:bg-paper-2"
+        >
+          ›
+        </button>
+      </div>
     </div>
   );
 }
