@@ -101,8 +101,8 @@ export function TodayView({
     return (
       <Card className="py-14 px-4 flex flex-col items-center text-center gap-3">
         <span className="text-[40px]">📅</span>
-        <p className="text-ink-2 text-sm">No matches today.</p>
-        <p className="text-ink-3 text-xs">Check back on match days for the latest games.</p>
+        <p className="text-ink-2 text-sm">No matches on this day.</p>
+        <p className="text-ink-3 text-xs">Try another day, or check back closer to kickoff.</p>
       </Card>
     );
   }

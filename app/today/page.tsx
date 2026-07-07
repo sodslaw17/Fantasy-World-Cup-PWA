@@ -9,12 +9,21 @@ import {
   type EffPickForDisplay,
   type CommentaryData,
 } from "@/components/today/TodayView";
+import { DateNav } from "@/components/today/DateNav";
 import type { Match, Prediction, Settings, CommentaryStatus, SassLevel } from "@/lib/db";
 import { isAdmin } from "@/lib/auth/roles";
+import { slotLabel, slotPrefix, type LabelNode } from "@/lib/bracket-label";
+import { todayInTz, dateStrInTz, getUtcDayWindow, formatDayLabel } from "@/lib/date-window";
 
 export const metadata = { title: "Today — WC26 Pool" };
 
-export default async function TodayPage() {
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+export default async function TodayPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ d?: string }>;
+}) {
   const supabase = await createClient();
   const {
     data: { user },
@@ -32,27 +41,18 @@ export default async function TodayPage() {
 
   const userTz = myProfile?.timezone ?? "America/Chicago";
 
-  // Compute today's UTC window in the user's local timezone so that browsing
-  // in the evening doesn't flip to tomorrow's games.
+  // "Today" is computed fresh from the user's local timezone so browsing in the
+  // evening doesn't flip to tomorrow's games. The selected day defaults to today
+  // and is otherwise driven by ?d=YYYY-MM-DD (date navigation, swipe, etc.).
   const now = new Date();
-  const todayStr = now.toLocaleDateString("sv-SE", { timeZone: userTz });
+  const todayStr = todayInTz(userTz, now);
+  const { d: rawSelected } = await searchParams;
+  const selectedStr = rawSelected && DATE_RE.test(rawSelected) ? rawSelected : todayStr;
 
-  // Derive the UTC offset via Intl — reliable regardless of the server's own TZ.
-  const parts = new Intl.DateTimeFormat("en-US", {
-    timeZone: userTz,
-    year: "numeric", month: "2-digit", day: "2-digit",
-    hour: "2-digit", minute: "2-digit", second: "2-digit",
-    hour12: false,
-  }).formatToParts(now);
-  const p = (type: string) => parseInt(parts.find((x) => x.type === type)!.value);
-  const localAsUTC = Date.UTC(p("year"), p("month") - 1, p("day"), p("hour") % 24, p("minute"), p("second"));
-  const offsetMs = now.getTime() - localAsUTC;
-
-  const startUTC = new Date(new Date(todayStr + "T00:00:00Z").getTime() + offsetMs);
-  const endUTC = new Date(startUTC.getTime() + 86_400_000);
+  const { startUTC, endUTC } = getUtcDayWindow(selectedStr, userTz, now);
 
   const [
-    { data: todayMatches },
+    { data: allMatches },
     { data: teams },
     { data: allPredictions },
     { data: profiles },
@@ -61,12 +61,7 @@ export default async function TodayPage() {
     { data: rawEffPicks },
     { data: commentaryConfig },
   ] = await Promise.all([
-    service
-      .from("matches")
-      .select("*")
-      .gte("kickoff_utc", startUTC.toISOString())
-      .lt("kickoff_utc", endUTC.toISOString())
-      .order("kickoff_utc"),
+    service.from("matches").select("*").order("kickoff_utc"),
     service.from("teams").select("fifa_code, name"),
     service.from("predictions").select("*"),
     service.from("profiles").select("id, display_name, auth_id, avatar_url"),
@@ -76,9 +71,70 @@ export default async function TodayPage() {
     service.from("commentary_config").select("sass_level").maybeSingle(),
   ]);
 
+  const allMatchesList = (allMatches ?? []) as Match[];
+
+  // Tournament date bounds (calendar days in the user's tz), so prev/next can't
+  // page into empty months before/after the tournament. `allMatchesList` is
+  // pre-sorted by kickoff_utc (query .order), so first/last are the extremes.
+  const minDateStr = allMatchesList.length
+    ? dateStrInTz(new Date(allMatchesList[0].kickoff_utc), userTz)
+    : todayStr;
+  const maxDateStr = allMatchesList.length
+    ? dateStrInTz(new Date(allMatchesList[allMatchesList.length - 1].kickoff_utc), userTz)
+    : todayStr;
+
+  const todayMatches = allMatchesList.filter((m) => {
+    const t = new Date(m.kickoff_utc).getTime();
+    return t >= startUTC.getTime() && t < endUTC.getTime();
+  });
+
+  // Bracket-slot label index (winner/loser per KO match), so future knockout
+  // fixtures whose teams aren't decided yet can show "Winner of X/Y" instead of
+  // breaking. Built from ALL knockout matches, not just the selected day's —
+  // mirrors app/bracket/page.tsx's winner/loser derivation exactly.
+  const labelIdx: Record<string, LabelNode> = Object.fromEntries(
+    allMatchesList
+      .filter((m) => m.stage !== "group")
+      .map((m) => {
+        const decided = m.home_goals != null && m.away_goals != null;
+        const winner = decided
+          ? m.home_goals! > m.away_goals! ? m.home_team_code
+          : m.away_goals! > m.home_goals! ? m.away_team_code
+          : m.shootout_winner === "home" ? m.home_team_code
+          : m.shootout_winner === "away" ? m.away_team_code
+          : null
+          : null;
+        const loser = winner === m.home_team_code ? m.away_team_code
+          : winner === m.away_team_code ? m.home_team_code
+          : null;
+        const node: LabelNode = {
+          winner: winner ?? null,
+          loser: loser ?? null,
+          homeCode: m.home_team_code,
+          awayCode: m.away_team_code,
+          homeFeedId: m.home_feed_match_id,
+          awayFeedId: m.away_feed_match_id,
+          homeFeedOutcome: m.home_feed_outcome ?? "winner",
+          awayFeedOutcome: m.away_feed_outcome ?? "winner",
+        };
+        return [m.id, node];
+      })
+  );
+
   const teamNames: Record<string, string> = Object.fromEntries(
     (teams ?? []).map((t) => [t.fifa_code, t.name])
   );
+
+  // Undecided-slot placeholder, e.g. "Winner of Brazil / Argentina".
+  function placeholderName(m: Match, side: "home" | "away"): string {
+    const feedId = side === "home" ? m.home_feed_match_id : m.away_feed_match_id;
+    const outcome = (side === "home" ? m.home_feed_outcome : m.away_feed_outcome) ?? "winner";
+    const candidates = slotLabel(null, feedId, labelIdx, 0, outcome);
+    const names = candidates === "?"
+      ? "TBD"
+      : candidates.split("/").map((c) => teamNames[c] ?? c).join(" / ");
+    return `${slotPrefix(outcome)} ${names}`;
+  }
 
   // Build profileId → {displayName, avatarUrl} for drafter lookup
   const profileById: Record<string, { displayName: string; avatarUrl: string | null }> =
@@ -116,18 +172,20 @@ export default async function TodayPage() {
     };
   });
 
-  // Fetch commentary for today's knockout matches (may not exist yet — graceful fallback)
-  const todayKOMatchIds = (todayMatches ?? [])
+  // Fetch commentary for the selected day's knockout matches — commentary is
+  // stored per match_id (not per day), so navigating to an already-played day
+  // transparently reuses whatever was generated then; nothing regenerates here.
+  const selectedKOMatchIds = todayMatches
     .filter((m: Match) => m.stage !== "group")
     .map((m: Match) => m.id);
 
   const commentaryRows =
-    todayKOMatchIds.length > 0
+    selectedKOMatchIds.length > 0
       ? (
           await service
             .from("match_commentary")
             .select("*")
-            .in("match_id", todayKOMatchIds)
+            .in("match_id", selectedKOMatchIds)
         ).data ?? []
       : [];
 
@@ -164,7 +222,7 @@ export default async function TodayPage() {
   // All profiles except the current user — include profiles without auth_id (show "No pick")
   const otherProfiles = (profiles ?? []).filter((p) => p.id !== myProfileRow?.id);
 
-  const enrichedMatches: TodayMatch[] = (todayMatches ?? []).map((m: Match) => {
+  const enrichedMatches: TodayMatch[] = todayMatches.map((m: Match) => {
     const matchPreds = predIndex[m.id] ?? {};
     const myPred = user.id in matchPreds ? matchPreds[user.id] : null;
 
@@ -182,10 +240,20 @@ export default async function TodayPage() {
       })
       .sort((a, b) => a.displayName.localeCompare(b.displayName));
 
+    // Future knockout fixtures whose teams aren't decided yet show a bracket-style
+    // placeholder ("Winner of Brazil / Argentina") instead of raw team codes/"TBD".
+    const isKnockout = m.stage !== "group";
+    const homeTeamName = m.home_team_code
+      ? teamNames[m.home_team_code] ?? m.home_team_code
+      : isKnockout ? placeholderName(m, "home") : "TBD";
+    const awayTeamName = m.away_team_code
+      ? teamNames[m.away_team_code] ?? m.away_team_code
+      : isKnockout ? placeholderName(m, "away") : "TBD";
+
     return {
       ...m,
-      homeTeamName: teamNames[m.home_team_code ?? ""] ?? m.home_team_code ?? "TBD",
-      awayTeamName: teamNames[m.away_team_code ?? ""] ?? m.away_team_code ?? "TBD",
+      homeTeamName,
+      awayTeamName,
       myPrediction: myPred
         ? { home: myPred.home_goals_pred, away: myPred.away_goals_pred }
         : null,
@@ -193,24 +261,19 @@ export default async function TodayPage() {
     };
   });
 
-  const todayLabel = now.toLocaleDateString("en-US", {
-    timeZone: userTz,
-    weekday: "long",
-    month: "long",
-    day: "numeric",
-  });
+  const dayLabel = formatDayLabel(selectedStr);
 
   return (
     <div className="flex flex-col h-dvh">
       <header className="bg-surface pt-[calc(env(safe-area-inset-top)+8px)]">
-        <div className="flex items-end justify-between gap-3 px-5 pt-2.5 pb-3">
+        <div className="flex items-end justify-between gap-3 px-5 pt-2.5 pb-1">
           <div className="min-w-0">
-            <div className="text-ink-2 text-[13px] font-semibold mb-0.5 truncate">{todayLabel}</div>
             <h1 className="m-0 font-display font-bold uppercase tracking-[.005em] leading-none text-ink text-[28px]">
               Today
             </h1>
           </div>
         </div>
+        <DateNav selected={selectedStr} today={todayStr} min={minDateStr} max={maxDateStr} label={dayLabel} />
         <div className="h-px bg-line" />
       </header>
       <div className="flex-1 overflow-y-auto">
