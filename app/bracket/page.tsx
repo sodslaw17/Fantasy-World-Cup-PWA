@@ -87,10 +87,9 @@ export default async function BracketPage() {
   }
 
   // Build Bracket tree.
-  // Slots are: team code string (known) | { win: matchId } (TBD, resolves via feed) | null.
-  // BracketScreen's canReach() / nextOf() walk the { win } references for path tracing.
-  const slot = (code: string | null, feedId: string | null) =>
-    code ? code : feedId ? { win: feedId } : null;
+  // Slots: string (known code) | { win: matchId } (winner feeds slot) | { lose: matchId } (loser feeds slot) | null
+  const slot = (code: string | null, feedId: string | null, outcome: 'winner' | 'loser' = 'winner') =>
+    code ? code : feedId ? (outcome === 'loser' ? { lose: feedId } : { win: feedId }) : null;
 
   const hasBronze = (byStage["bronze"]?.length ?? 0) > 0;
   const allStages = hasBronze ? [...STAGE_ORDER, "bronze"] : [...STAGE_ORDER];
@@ -101,26 +100,27 @@ export default async function BracketPage() {
       id: stageId,
       label: meta.label,
       short: meta.short,
-      matches: stageMatches.map((m) => ({
-        id: m.id,
-        home: slot(m.home_team_code, m.home_feed_match_id),
-        away: slot(m.away_team_code, m.away_feed_match_id),
-        result:
-          m.home_goals != null && m.away_goals != null
-            ? { h: m.home_goals, a: m.away_goals }
-            : undefined,
-        winner: m.home_goals != null && m.away_goals != null
-          ? m.home_goals > m.away_goals
-            ? (m.home_team_code ?? undefined)
-            : m.away_goals > m.home_goals
-            ? (m.away_team_code ?? undefined)
-            : m.shootout_winner === "home"
-            ? (m.home_team_code ?? undefined)
-            : m.shootout_winner === "away"
-            ? (m.away_team_code ?? undefined)
-            : undefined
-          : undefined,
-      })),
+      matches: stageMatches.map((m) => {
+        const decided = m.home_goals != null && m.away_goals != null;
+        const winner = decided
+          ? m.home_goals! > m.away_goals! ? (m.home_team_code ?? undefined)
+          : m.away_goals! > m.home_goals! ? (m.away_team_code ?? undefined)
+          : m.shootout_winner === "home" ? (m.home_team_code ?? undefined)
+          : m.shootout_winner === "away" ? (m.away_team_code ?? undefined)
+          : undefined
+          : undefined;
+        const loser = winner === m.home_team_code ? (m.away_team_code ?? undefined)
+          : winner === m.away_team_code ? (m.home_team_code ?? undefined)
+          : undefined;
+        return {
+          id: m.id,
+          home: slot(m.home_team_code, m.home_feed_match_id, m.home_feed_outcome ?? 'winner'),
+          away: slot(m.away_team_code, m.away_feed_match_id, m.away_feed_outcome ?? 'winner'),
+          result: decided ? { h: m.home_goals!, a: m.away_goals! } : undefined,
+          winner,
+          loser,
+        };
+      }),
     };
   });
 

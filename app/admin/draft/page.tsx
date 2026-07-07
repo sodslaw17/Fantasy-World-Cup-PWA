@@ -1,5 +1,6 @@
 import { createServiceClient } from "@/lib/supabase/service";
 import { DraftManager } from "@/components/admin/DraftManager";
+import { AdminPageHeader } from "../_components/AdminShell";
 import type { Settings } from "@/lib/db";
 
 export const metadata = { title: "Draft — WC26 Admin" };
@@ -17,16 +18,13 @@ export default async function DraftPage() {
 
   const draftLocked = (settings as Pick<Settings, "draft_locked"> | null)?.draft_locked ?? false;
 
-  // Build team lookup
   const teamById: Record<string, { id: string; fifa_code: string; name: string; group_letter: string | null }> =
     Object.fromEntries((teams ?? []).map((t) => [t.id, t]));
 
-  // Build picks per profile
   const picksByProfile: Record<string, typeof teams> = {};
   for (const d of drafts ?? []) {
     (picksByProfile[d.profile_id] ??= []).push(teamById[d.team_id]);
   }
-  // Sort picks by pick_number
   for (const pid of Object.keys(picksByProfile)) {
     picksByProfile[pid] = (picksByProfile[pid] ?? []).sort(
       (a, b) =>
@@ -44,17 +42,18 @@ export default async function DraftPage() {
   }));
 
   return (
-    <main className="p-4 max-w-2xl mx-auto">
-      <h1 className="text-lg font-bold text-gold mb-1">Draft</h1>
-      <p className="text-sm text-paper/50 mb-5">
-        Assign 3 knockout teams per player, then lock the draft. Locked picks
-        are shown to all users.
-      </p>
-      <DraftManager
-        players={players}
-        allTeams={teams ?? []}
-        draftLocked={draftLocked}
+    <div className="max-w-3xl mx-auto">
+      <AdminPageHeader
+        title="Draft"
+        sub="Assign 3 knockout teams per player, then lock the draft"
       />
-    </main>
+      <div className="px-4 pb-8">
+        <DraftManager
+          players={players}
+          allTeams={teams ?? []}
+          draftLocked={draftLocked}
+        />
+      </div>
+    </div>
   );
 }

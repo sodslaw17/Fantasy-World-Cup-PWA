@@ -1,9 +1,10 @@
 import { createServiceClient } from "@/lib/supabase/service";
 import { GroupResultsTab, KnockoutResultsTab } from "@/components/admin/results/MatchResultEntry";
 import { ResultsTabs } from "@/components/admin/results/ResultsTabs";
+import { AdminPageHeader } from "../_components/AdminShell";
 import type { Match } from "@/lib/db";
 
-export const metadata = { title: "Results — WC26 Admin" };
+export const metadata = { title: "Match & Stats — WC26 Admin" };
 
 export default async function ResultsPage() {
   const service = createServiceClient();
@@ -21,7 +22,6 @@ export default async function ResultsPage() {
   const groupMatches = allMatches.filter((m) => m.stage === "group");
   const knockoutMatches = allMatches.filter((m) => m.stage !== "group");
 
-  // Group matches by group letter with team names
   const groups: Record<
     string,
     { match: Match; homeTeam: string; awayTeam: string }[]
@@ -39,20 +39,22 @@ export default async function ResultsPage() {
   const total = groupMatches.length;
 
   return (
-    <main className="p-4 max-w-2xl mx-auto">
-      <h1 className="text-lg font-bold text-gold mb-1">Match Results</h1>
-      <p className="text-sm text-paper/50 mb-4">
-        {done}/{total} group matches entered
-      </p>
-      <ResultsTabs
-        groupTab={<GroupResultsTab groups={groups} />}
-        knockoutTab={
-          <KnockoutResultsTab
-            matches={knockoutMatches}
-            teamNames={teamNames}
-          />
-        }
+    <div className="max-w-3xl mx-auto">
+      <AdminPageHeader
+        title="Match & Stats"
+        sub={`${done} / ${total} group matches entered`}
       />
-    </main>
+      <div className="px-4 pb-8">
+        <ResultsTabs
+          groupTab={<GroupResultsTab groups={groups} />}
+          knockoutTab={
+            <KnockoutResultsTab
+              matches={knockoutMatches}
+              teamNames={teamNames}
+            />
+          }
+        />
+      </div>
+    </div>
   );
 }

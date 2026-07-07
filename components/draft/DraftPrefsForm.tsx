@@ -16,7 +16,6 @@ interface Prefs {
   notes: string | null;
 }
 
-// Build the 10 sortable position items
 function buildPositionItems(savedOrder?: number[] | null) {
   const all = Array.from({ length: 10 }, (_, i) => i + 1);
   const ordered = savedOrder?.length
@@ -38,7 +37,6 @@ export function DraftPrefsForm({ teams, existing }: { teams: Team[]; existing: P
     initState
   );
 
-  // ── Position order ───────────────────────────────────────────
   const [initialPositionItems] = useState(() =>
     buildPositionItems(existing?.position_preferences)
   );
@@ -52,7 +50,6 @@ export function DraftPrefsForm({ teams, existing }: { teams: Team[]; existing: P
     if (positionRef.current) positionRef.current.value = ids.join(",");
   }
 
-  // ── Team order ───────────────────────────────────────────────
   const teamByCode = Object.fromEntries(teams.map((t) => [t.fifa_code, t.name]));
 
   const [initialTeamItems] = useState(() => {
@@ -74,17 +71,16 @@ export function DraftPrefsForm({ teams, existing }: { teams: Team[]; existing: P
 
   return (
     <form action={action} className="space-y-8">
-      {/* Hidden inputs */}
       <input ref={positionRef} type="hidden" name="position_preferences"
         defaultValue={positionOrder.join(",")} />
       <input ref={teamRef} type="hidden" name="team_wishlist"
         defaultValue={initialTeamItems.map((t) => t.id).join(",")} />
 
-      {/* ── Position preference ──────────────────────────────── */}
+      {/* Position preference */}
       <div className="space-y-2">
         <div>
-          <label className="block text-sm font-medium">Draft position preference</label>
-          <p className="text-xs text-paper/40 mt-0.5">
+          <label className="block text-sm font-medium text-ink">Draft position preference</label>
+          <p className="text-xs text-ink-3 mt-0.5">
             Drag to rank positions from most to least preferred. Position at the top
             is your first choice. Each row shows which overall picks that position gets.
           </p>
@@ -95,11 +91,11 @@ export function DraftPrefsForm({ teams, existing }: { teams: Team[]; existing: P
         />
       </div>
 
-      {/* ── Team preference ──────────────────────────────────── */}
+      {/* Team preference */}
       <div className="space-y-2">
         <div>
-          <label className="block text-sm font-medium">Team preference order</label>
-          <p className="text-xs text-paper/40 mt-0.5">
+          <label className="block text-sm font-medium text-ink">Team preference order</label>
+          <p className="text-xs text-ink-3 mt-0.5">
             Drag to rank all teams from most to least wanted.
             Default order is FIFA ranking. Hold briefly then drag on mobile.
           </p>
@@ -112,17 +108,24 @@ export function DraftPrefsForm({ teams, existing }: { teams: Team[]; existing: P
 
       {/* Notes */}
       <div className="space-y-1.5">
-        <label className="block text-sm font-medium">Notes for the admin</label>
-        <textarea name="notes" defaultValue={existing?.notes ?? ""} rows={3}
+        <label className="block text-sm font-medium text-ink">Notes for the admin</label>
+        <textarea
+          name="notes"
+          defaultValue={existing?.notes ?? ""}
+          rows={3}
           placeholder="Any instructions if you can't be reached during the draft…"
-          className="w-full rounded-lg bg-ink border border-paper/20 px-3 py-2.5 text-sm text-paper placeholder:text-paper/30 focus:outline-none focus:ring-1 focus:ring-gold resize-y" />
+          className="w-full rounded-lg bg-surface border border-line-2 px-3 py-2.5 text-sm text-ink placeholder:text-ink-3 focus:outline-none focus:ring-1 focus:ring-brand resize-y"
+        />
       </div>
 
-      {state.error && <p className="text-sm text-accent-red">{state.error}</p>}
-      {state.success && <p className="text-sm text-accent-green">✓ Preferences saved.</p>}
+      {state.error && <p className="text-sm text-red-ink">{state.error}</p>}
+      {state.success && <p className="text-sm text-green-ink">✓ Preferences saved.</p>}
 
-      <button type="submit" disabled={pending}
-        className="w-full rounded-lg bg-gold text-ink font-semibold py-3 min-h-tap disabled:opacity-50">
+      <button
+        type="submit"
+        disabled={pending}
+        className="w-full rounded-lg bg-brand text-brand-on font-semibold py-3 min-h-[48px] disabled:opacity-50"
+      >
         {pending ? "Saving…" : "Save preferences"}
       </button>
     </form>

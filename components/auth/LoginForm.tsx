@@ -1,112 +1,145 @@
 "use client";
 
-import { useActionState, useEffect, useRef } from "react";
+import { useActionState, useEffect, useRef, useState } from "react";
 import { loginAction } from "@/app/login/actions";
-
-const TIMEZONES = [
-  { value: "America/New_York",     label: "Eastern (ET)" },
-  { value: "America/Chicago",      label: "Central (CT)" },
-  { value: "America/Denver",       label: "Mountain (MT)" },
-  { value: "America/Los_Angeles",  label: "Pacific (PT)" },
-  { value: "America/Anchorage",    label: "Alaska (AKT)" },
-  { value: "Pacific/Honolulu",     label: "Hawaii (HT)" },
-  { value: "America/Toronto",      label: "Toronto (ET)" },
-  { value: "America/Vancouver",    label: "Vancouver (PT)" },
-  { value: "America/Mexico_City",  label: "Mexico City (CT)" },
-  { value: "Europe/London",        label: "London (GMT/BST)" },
-  { value: "Europe/Paris",         label: "Paris (CET/CEST)" },
-  { value: "Asia/Tokyo",           label: "Tokyo (JST)" },
-  { value: "Australia/Sydney",     label: "Sydney (AEST/AEDT)" },
-];
-
-const DEFAULT_TZ = "America/Chicago";
+import { Btn } from "@/components/wc-ui";
+import { Field, Input } from "@/components/wc-form";
 
 const initialState = { error: undefined as string | undefined, success: false };
 
+function SpectrumBar() {
+  const cols = ["#E4002B", "#FF7A00", "#FFC400", "#00A859", "#1D4ED8", "#7C3AED"];
+  return (
+    <div className="flex justify-center gap-[5px] mb-4">
+      {cols.map((c, i) => (
+        <span key={i} className="w-[26px] h-1.5 rounded-pill" style={{ background: c }} />
+      ))}
+    </div>
+  );
+}
+
+function SentState({ email, onResend }: { email: string; onResend: () => void }) {
+  return (
+    <div className="flex flex-col gap-4 text-center">
+      <div className="grid place-items-center w-[60px] h-[60px] rounded-pill mx-auto bg-green-soft text-green-ink">
+        <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <path d="M4 6l8 6 8-6" strokeLinecap="round" strokeLinejoin="round" />
+          <rect x="3" y="5" width="18" height="14" rx="2.5" />
+        </svg>
+      </div>
+      <div>
+        <div className="font-display font-bold uppercase text-[25px] text-ink leading-none">
+          Check your email
+        </div>
+        <div className="mt-[9px] text-sm font-medium text-ink-2 leading-[1.45]">
+          We sent a sign-in link to
+          <br />
+          <span className="text-ink font-bold">{email}</span>
+        </div>
+      </div>
+      <Btn kind="ghost" full className="min-h-[50px]">Open mail app</Btn>
+      <button
+        type="button"
+        onClick={onResend}
+        className="bg-transparent border-0 cursor-pointer text-[13.5px] font-bold text-brand-ink"
+      >
+        Didn&apos;t get it? Resend link
+      </button>
+    </div>
+  );
+}
+
 export function LoginForm() {
+  const [submittedEmail, setSubmittedEmail] = useState("");
   const [state, formAction, isPending] = useActionState(
     async (_prev: typeof initialState, formData: FormData) => {
+      const emailVal = formData.get("email");
+      if (typeof emailVal === "string") setSubmittedEmail(emailVal.trim().toLowerCase());
       const result = await loginAction(formData);
       return { error: result.error, success: result.success ?? false };
     },
     initialState
   );
 
-  const tzRef = useRef<HTMLSelectElement>(null);
+  const tzRef = useRef<HTMLInputElement>(null);
 
-  // Detect browser timezone on mount and set the select value
   useEffect(() => {
     if (!tzRef.current) return;
-    const detected = Intl.DateTimeFormat().resolvedOptions().timeZone;
-    if (TIMEZONES.some((tz) => tz.value === detected)) {
-      tzRef.current.value = detected;
-    }
+    tzRef.current.value = Intl.DateTimeFormat().resolvedOptions().timeZone || "";
   }, []);
 
   if (state.success) {
     return (
-      <div className="text-center space-y-3">
-        <div className="text-4xl">📨</div>
-        <h2 className="text-xl font-semibold text-gold">Check your email</h2>
-        <p className="text-sm text-paper/70">
-          We sent you a magic link. Tap it to sign in — no password needed.
-        </p>
+      <div className="px-6 pb-8 pt-2">
+        <SpectrumBar />
+        <SentState
+          email={submittedEmail}
+          onResend={() => window.location.reload()}
+        />
       </div>
     );
   }
 
   return (
-    <form action={formAction} className="space-y-4">
-      <div>
-        <label htmlFor="email" className="block text-sm font-medium mb-1.5">
-          Email address
-        </label>
-        <input
-          id="email"
-          name="email"
-          type="email"
-          autoComplete="email"
-          required
-          placeholder="you@example.com"
-          className="w-full rounded-lg bg-ink-soft border border-paper/20 px-4 py-3 text-paper placeholder:text-paper/40 focus:outline-none focus:ring-2 focus:ring-gold min-h-tap"
-        />
-      </div>
+    <div className="px-6 pb-[calc(env(safe-area-inset-bottom)+22px)] pt-2">
+      <SpectrumBar />
 
-      <div>
-        <label htmlFor="timezone" className="block text-sm font-medium mb-1.5">
-          Your timezone
-        </label>
-        <select
-          ref={tzRef}
-          id="timezone"
-          name="timezone"
-          defaultValue={DEFAULT_TZ}
-          className="w-full rounded-lg bg-ink-soft border border-paper/20 px-4 py-3 text-paper focus:outline-none focus:ring-2 focus:ring-gold min-h-tap"
-        >
-          {TIMEZONES.map((tz) => (
-            <option key={tz.value} value={tz.value}>
-              {tz.label}
-            </option>
-          ))}
-        </select>
-        <p className="mt-1 text-xs text-paper/40">
-          Used to show today&apos;s matches in your local time. Auto-detected — change if wrong.
-        </p>
-      </div>
+      <form action={formAction} className="flex flex-col gap-4">
+        {/* hidden timezone — preserved for first-login redirect */}
+        <input ref={tzRef} type="hidden" name="timezone" />
 
-      {state.error && (
-        <p role="alert" className="text-sm text-accent-red">
-          {state.error}
-        </p>
-      )}
+        <div className="text-center">
+          <div className="font-display font-bold uppercase text-[30px] text-ink leading-none tracking-[.01em]">
+            Kick off
+          </div>
+          <div className="mt-[7px] text-[13.5px] font-medium text-ink-2">
+            Sign in to your World Cup pool — no password.
+          </div>
+        </div>
 
-      <button
-        type="submit"
-        disabled={isPending}
-        className="w-full rounded-lg bg-gold text-ink font-semibold py-3 min-h-tap disabled:opacity-50 transition-opacity active:scale-95"
-      >
-        {isPending ? "Sending…" : "Send magic link"}
-      </button>
-    </form>
+        <Field label="Email address" hint="Use the address your pool organizer added." htmlFor="email">
+          <Input
+            id="email"
+            name="email"
+            big
+            type="email"
+            autoComplete="email"
+            required
+            placeholder="you@email.com"
+            leftIcon={
+              <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.7">
+                <rect x="2" y="4" width="16" height="12" rx="2.5" />
+                <path d="M3 6l7 5 7-5" strokeLinecap="round" />
+              </svg>
+            }
+          />
+        </Field>
+
+        {state.error && (
+          <p role="alert" className="text-sm font-semibold text-red-ink -mt-1">
+            {state.error}
+          </p>
+        )}
+
+        <Btn type="submit" kind="primary" full disabled={isPending} className="min-h-[54px] text-[17px]">
+          {isPending ? "Sending…" : "Send magic link"}
+          {!isPending && (
+            <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M4 10h11M11 5l5 5-5 5" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          )}
+        </Btn>
+
+        <div className="flex items-center justify-center gap-[7px]">
+          <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8" className="text-ink-3">
+            <rect x="4" y="9" width="12" height="8" rx="2" />
+            <path d="M7 9V6.5a3 3 0 016 0V9" />
+          </svg>
+          <span className="text-[11.5px] font-bold tracking-[.04em] uppercase text-ink-3">
+            Private pool · invite only
+          </span>
+        </div>
+      </form>
+    </div>
   );
 }

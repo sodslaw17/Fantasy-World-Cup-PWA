@@ -49,7 +49,7 @@ export function SettingsForm({ settings }: { settings: Settings }) {
         <select
           name="current_phase_override"
           defaultValue={settings.current_phase_override ?? ""}
-          className="w-full rounded-lg bg-ink border border-paper/20 px-3 py-2.5 text-sm text-paper focus:outline-none focus:ring-1 focus:ring-gold min-h-tap"
+          className="w-full rounded-lg bg-paper-2 border border-line-2 px-3 py-2.5 text-sm text-ink focus:outline-none focus:ring-1 focus:ring-brand min-h-tap"
         >
           {PHASE_OPTIONS.map((o) => (
             <option key={o.value} value={o.value}>
@@ -57,7 +57,7 @@ export function SettingsForm({ settings }: { settings: Settings }) {
             </option>
           ))}
         </select>
-        <p className="text-xs text-paper/40">
+        <p className="text-xs text-ink-3">
           Force a specific phase regardless of timestamps.
         </p>
       </div>
@@ -68,9 +68,9 @@ export function SettingsForm({ settings }: { settings: Settings }) {
           name="draft_standby_text"
           defaultValue={settings.draft_standby_text}
           rows={4}
-          className="w-full rounded-lg bg-ink border border-paper/20 px-3 py-2.5 text-sm text-paper focus:outline-none focus:ring-1 focus:ring-gold resize-y"
+          className="w-full rounded-lg bg-paper-2 border border-line-2 px-3 py-2.5 text-sm text-ink focus:outline-none focus:ring-1 focus:ring-brand resize-y"
         />
-        <p className="text-xs text-paper/40">
+        <p className="text-xs text-ink-3">
           Shown to users on the home screen during the draft standby phase.
         </p>
       </div>
@@ -112,9 +112,9 @@ function Field({
         type="text"
         defaultValue={defaultValue}
         placeholder="2026-06-11T19:00:00Z"
-        className="w-full rounded-lg bg-ink border border-paper/20 px-3 py-2.5 text-sm text-paper placeholder:text-paper/30 font-mono focus:outline-none focus:ring-1 focus:ring-gold min-h-tap"
+        className="w-full rounded-lg bg-paper-2 border border-line-2 px-3 py-2.5 text-sm text-ink placeholder:text-ink-3 font-mono focus:outline-none focus:ring-1 focus:ring-brand min-h-tap"
       />
-      {hint && <p className="text-xs text-paper/40">{hint}</p>}
+      {hint && <p className="text-xs text-ink-3">{hint}</p>}
     </div>
   );
 }

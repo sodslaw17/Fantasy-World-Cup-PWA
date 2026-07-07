@@ -1,8 +1,9 @@
 "use client";
 
 import { useActionState, useState, useTransition } from "react";
-import { saveMatchResult, createKnockoutMatch, setMatchFeeds } from "@/app/admin/results/actions";
+import { saveMatchResult, createKnockoutMatch, setMatchFeeds, updateKnockoutMatch, deleteKnockoutMatch } from "@/app/admin/results/actions";
 import type { Match } from "@/lib/db";
+import { slotLabel, slotPrefix, type LabelNode } from "@/lib/bracket-label";
 
 const initState = { error: undefined as string | undefined, success: false };
 
@@ -183,18 +184,58 @@ const STAGE_SHORT: Record<string, string> = {
   r32: "R32", r16: "R16", qf: "QF", sf: "SF", final: "F", bronze: "3rd",
 };
 
-function matchOptionLabel(m: Match, teamNames: Record<string, string>) {
-  const home = m.home_team_code ? (teamNames[m.home_team_code] ?? m.home_team_code) : "TBD";
-  const away = m.away_team_code ? (teamNames[m.away_team_code] ?? m.away_team_code) : "TBD";
-  return `${STAGE_SHORT[m.stage] ?? m.stage} · ${home} vs ${away}`;
+function matchWinner(m: Match): string | null {
+  if (m.home_goals == null || m.away_goals == null) return null;
+  if (m.home_goals > m.away_goals) return m.home_team_code ?? null;
+  if (m.away_goals > m.home_goals) return m.away_team_code ?? null;
+  if (m.shootout_winner === "home") return m.home_team_code ?? null;
+  if (m.shootout_winner === "away") return m.away_team_code ?? null;
+  return null;
+}
+
+function buildLabelIndex(matches: Match[]): Record<string, LabelNode> {
+  return Object.fromEntries(
+    matches.map((m) => [
+      m.id,
+      {
+        winner: matchWinner(m),
+        loser: (() => {
+          const w = matchWinner(m);
+          if (!w) return null;
+          return w === m.home_team_code ? m.away_team_code : m.home_team_code;
+        })(),
+        homeCode: m.home_team_code,
+        awayCode: m.away_team_code,
+        homeFeedId: m.home_feed_match_id,
+        awayFeedId: m.away_feed_match_id,
+        homeFeedOutcome: (m.home_feed_outcome ?? 'winner') as 'winner' | 'loser',
+        awayFeedOutcome: (m.away_feed_outcome ?? 'winner') as 'winner' | 'loser',
+      },
+    ])
+  );
+}
+
+// Returns "R32 · USA vs MEX" for known teams, "R16 · USA/MEX vs GER/PAR" for undecided,
+// "3rd · Loser of SF1/SF2" for loser-fed slots. Never emits a raw UUID.
+function matchOptionLabel(m: Match, labelIdx: Record<string, LabelNode>): string {
+  const stage = STAGE_SHORT[m.stage] ?? m.stage;
+  const hOut = (m.home_feed_outcome ?? 'winner') as 'winner' | 'loser';
+  const aOut = (m.away_feed_outcome ?? 'winner') as 'winner' | 'loser';
+  const h = slotLabel(m.home_team_code, m.home_feed_match_id, labelIdx, 0, hOut);
+  const a = slotLabel(m.away_team_code, m.away_feed_match_id, labelIdx, 0, aOut);
+  const hLabel = h !== "?" ? (m.home_team_code ? h : `${slotPrefix(hOut)} ${h}`) : "?";
+  const aLabel = a !== "?" ? (m.away_team_code ? a : `${slotPrefix(aOut)} ${a}`) : "?";
+  return `${stage} · ${hLabel} vs ${aLabel}`;
 }
 
 // ── Bracket wiring section ─────────────────────────────────────────────────
 
-function BracketWiringSection({ matches, teamNames }: { matches: Match[]; teamNames: Record<string, string> }) {
+type WiringDraft = { home: string; away: string; homeOutcome: 'winner' | 'loser'; awayOutcome: 'winner' | 'loser' };
+
+function BracketWiringSection({ matches, labelIdx }: { matches: Match[]; labelIdx: Record<string, LabelNode> }) {
   const [pending, startTransition] = useTransition();
   const [messages, setMessages] = useState<Record<string, string>>({});
-  const [drafts, setDrafts] = useState<Record<string, { home: string; away: string }>>({});
+  const [drafts, setDrafts] = useState<Record<string, WiringDraft>>({});
   const [open, setOpen] = useState(false);
 
   const wirableStages = ["r16", "qf", "sf", "final", "bronze"];
@@ -202,17 +243,19 @@ function BracketWiringSection({ matches, teamNames }: { matches: Match[]; teamNa
 
   if (wirableMatches.length === 0) return null;
 
-  function getDraft(matchId: string, m: Match) {
+  function getDraft(matchId: string, m: Match): WiringDraft {
     return drafts[matchId] ?? {
       home: m.home_feed_match_id ?? "",
       away: m.away_feed_match_id ?? "",
+      homeOutcome: (m.home_feed_outcome ?? 'winner') as 'winner' | 'loser',
+      awayOutcome: (m.away_feed_outcome ?? 'winner') as 'winner' | 'loser',
     };
   }
 
   function handleSave(m: Match) {
-    const { home, away } = getDraft(m.id, m);
+    const { home, away, homeOutcome, awayOutcome } = getDraft(m.id, m);
     startTransition(async () => {
-      const result = await setMatchFeeds(m.id, home || null, away || null);
+      const result = await setMatchFeeds(m.id, home || null, away || null, homeOutcome, awayOutcome);
       setMessages((prev) => ({ ...prev, [m.id]: result.error ?? "Saved" }));
       setTimeout(() => setMessages((prev) => ({ ...prev, [m.id]: "" })), 3000);
     });
@@ -229,10 +272,11 @@ function BracketWiringSection({ matches, teamNames }: { matches: Match[]; teamNa
       </button>
 
       {open && (
-        <div className="border-t border-line divide-y divide-line">
+        <div className="border-t border-line divide-y divide-line overflow-y-auto max-h-[70vh]">
           <p className="px-4 py-2.5 text-xs text-ink-2">
-            For each R16–Final match, select which earlier match's winner fills each slot.
-            Once wired, tapping a team in the bracket traces its full path to the Final.
+            For each R16–Final match, select which earlier match feeds each slot and whether it advances the winner or loser.
+            Set Bronze Final slots to &quot;loser&quot; of each semifinal.
+            Once wired, tapping a team in the bracket traces its full path.
           </p>
           {wirableStages.flatMap((stageId) => {
             const feedStage = FEED_STAGE[stageId];
@@ -242,35 +286,57 @@ function BracketWiringSection({ matches, teamNames }: { matches: Match[]; teamNa
             return stageMatches.map((m) => {
               const draft = getDraft(m.id, m);
               const msg = messages[m.id];
+              const outcomeSelect = (side: 'home' | 'away') => (
+                <select
+                  value={side === 'home' ? draft.homeOutcome : draft.awayOutcome}
+                  onChange={(e) => {
+                    const val = e.target.value as 'winner' | 'loser';
+                    setDrafts((d) => ({
+                      ...d,
+                      [m.id]: { ...getDraft(m.id, m), [side === 'home' ? 'homeOutcome' : 'awayOutcome']: val },
+                    }));
+                  }}
+                  className="rounded-lg bg-paper-2 border border-line-2 px-2 py-1.5 text-xs text-ink focus:outline-none focus:ring-1 focus:ring-brand"
+                >
+                  <option value="winner">Winner</option>
+                  <option value="loser">Loser</option>
+                </select>
+              );
               return (
                 <div key={m.id} className="px-4 py-3 space-y-2">
-                  <p className="text-xs font-semibold text-ink">{matchOptionLabel(m, teamNames)}</p>
+                  <p className="text-xs font-semibold text-ink">{matchOptionLabel(m, labelIdx)}</p>
                   <div className="flex gap-2 items-end">
                     <div className="flex-1 space-y-1">
                       <label className="text-[10px] text-ink-3 uppercase tracking-wide">Home slot feeds from</label>
-                      <select
-                        value={draft.home}
-                        onChange={(e) => setDrafts((d) => ({ ...d, [m.id]: { ...getDraft(m.id, m), home: e.target.value } }))}
-                        className="w-full rounded-lg bg-paper-2 border border-line-2 px-2 py-1.5 text-xs text-ink focus:outline-none focus:ring-1 focus:ring-brand"
-                      >
-                        <option value="">— none —</option>
-                        {feedCandidates.map((fc) => (
-                          <option key={fc.id} value={fc.id}>{matchOptionLabel(fc, teamNames)}</option>
-                        ))}
-                      </select>
+                      <div className="flex gap-1">
+                        {outcomeSelect('home')}
+                        <select
+                          value={draft.home}
+                          onChange={(e) => setDrafts((d) => ({ ...d, [m.id]: { ...getDraft(m.id, m), home: e.target.value } }))}
+                          className="flex-1 rounded-lg bg-paper-2 border border-line-2 px-2 py-1.5 text-xs text-ink focus:outline-none focus:ring-1 focus:ring-brand"
+                        >
+                          <option value="">— none —</option>
+                          {feedCandidates.map((fc) => (
+                            <option key={fc.id} value={fc.id}>{matchOptionLabel(fc, labelIdx)}</option>
+                          ))}
+                        </select>
+                      </div>
                     </div>
                     <div className="flex-1 space-y-1">
                       <label className="text-[10px] text-ink-3 uppercase tracking-wide">Away slot feeds from</label>
-                      <select
-                        value={draft.away}
-                        onChange={(e) => setDrafts((d) => ({ ...d, [m.id]: { ...getDraft(m.id, m), away: e.target.value } }))}
-                        className="w-full rounded-lg bg-paper-2 border border-line-2 px-2 py-1.5 text-xs text-ink focus:outline-none focus:ring-1 focus:ring-brand"
-                      >
-                        <option value="">— none —</option>
-                        {feedCandidates.map((fc) => (
-                          <option key={fc.id} value={fc.id}>{matchOptionLabel(fc, teamNames)}</option>
-                        ))}
-                      </select>
+                      <div className="flex gap-1">
+                        {outcomeSelect('away')}
+                        <select
+                          value={draft.away}
+                          onChange={(e) => setDrafts((d) => ({ ...d, [m.id]: { ...getDraft(m.id, m), away: e.target.value } }))}
+                          className="flex-1 rounded-lg bg-paper-2 border border-line-2 px-2 py-1.5 text-xs text-ink focus:outline-none focus:ring-1 focus:ring-brand"
+                        >
+                          <option value="">— none —</option>
+                          {feedCandidates.map((fc) => (
+                            <option key={fc.id} value={fc.id}>{matchOptionLabel(fc, labelIdx)}</option>
+                          ))}
+                        </select>
+                      </div>
                     </div>
                     <div className="shrink-0 pb-0.5">
                       <button
@@ -297,6 +363,138 @@ function BracketWiringSection({ matches, teamNames }: { matches: Match[]; teamNa
   );
 }
 
+// ── Knockout match card with inline edit / delete ──────────────────────────
+
+function KnockoutMatchCard({ match, teamNames, labelIdx }: { match: Match; teamNames: Record<string, string>; labelIdx: Record<string, LabelNode> }) {
+  const side = (code: string | null, feedId: string | null) => {
+    if (code) return teamNames[code] ?? code;
+    const lbl = slotLabel(null, feedId, labelIdx);
+    return lbl !== "?" ? lbl : "TBD";
+  };
+  const homeTeam = side(match.home_team_code, match.home_feed_match_id);
+  const awayTeam = side(match.away_team_code, match.away_feed_match_id);
+
+  const [mode, setMode] = useState<"view" | "edit" | "confirmDelete">("view");
+  const [pending, startTransition] = useTransition();
+  const [editError, setEditError] = useState<string | null>(null);
+  const [editSuccess, setEditSuccess] = useState(false);
+
+  function handleEdit(fd: FormData) {
+    setEditError(null);
+    setEditSuccess(false);
+    startTransition(async () => {
+      const r = await updateKnockoutMatch(fd);
+      if (r.error) { setEditError(r.error); }
+      else { setEditSuccess(true); setMode("view"); }
+    });
+  }
+
+  function handleDelete() {
+    startTransition(async () => {
+      await deleteKnockoutMatch(match.id);
+    });
+  }
+
+  return (
+    <div className="rounded-xl bg-paper-2 border border-line p-4 space-y-3">
+      {/* Score entry always visible */}
+      <MatchResultForm match={match} homeTeam={homeTeam} awayTeam={awayTeam} />
+
+      {/* Edit / Delete controls */}
+      {mode === "view" && (
+        <div className="flex gap-2 pt-1 border-t border-line">
+          <button
+            onClick={() => setMode("edit")}
+            className="flex-1 rounded-lg border border-line-2 text-xs font-semibold text-ink-2 py-1.5 hover:bg-paper-2"
+          >
+            Edit fixture
+          </button>
+          <button
+            onClick={() => setMode("confirmDelete")}
+            className="rounded-lg border border-accent-red/40 text-xs font-semibold text-accent-red px-3 py-1.5 hover:bg-accent-red/10"
+          >
+            Delete
+          </button>
+        </div>
+      )}
+
+      {mode === "edit" && (
+        <form
+          action={handleEdit}
+          className="space-y-2 pt-1 border-t border-line"
+        >
+          <input type="hidden" name="match_id" value={match.id} />
+          <p className="text-xs font-semibold text-ink-2">Edit fixture</p>
+          <div className="flex gap-2">
+            <input
+              name="home_team_code"
+              type="text"
+              list="team-codes-list"
+              defaultValue={match.home_team_code ?? ""}
+              placeholder="Home code (blank = TBD)"
+              className="flex-1 rounded-lg bg-paper-2 border border-line-2 px-3 py-2 text-sm font-mono text-ink placeholder:text-ink-3 focus:outline-none focus:ring-1 focus:ring-brand"
+            />
+            <span className="self-center text-ink-3 text-sm">vs</span>
+            <input
+              name="away_team_code"
+              type="text"
+              list="team-codes-list"
+              defaultValue={match.away_team_code ?? ""}
+              placeholder="Away code (blank = TBD)"
+              className="flex-1 rounded-lg bg-paper-2 border border-line-2 px-3 py-2 text-sm font-mono text-ink placeholder:text-ink-3 focus:outline-none focus:ring-1 focus:ring-brand"
+            />
+          </div>
+          <input
+            name="kickoff_utc"
+            type="text"
+            defaultValue={match.kickoff_utc}
+            placeholder="2026-07-01T19:00:00Z"
+            className="w-full rounded-lg bg-paper-2 border border-line-2 px-3 py-2 text-sm font-mono text-ink placeholder:text-ink-3 focus:outline-none focus:ring-1 focus:ring-brand"
+          />
+          {editError && <p className="text-xs text-accent-red">{editError}</p>}
+          <div className="flex gap-2">
+            <button
+              type="submit"
+              disabled={pending}
+              className="flex-1 rounded-lg bg-brand text-white text-xs font-semibold py-2 disabled:opacity-50"
+            >
+              {pending ? "Saving…" : "Save changes"}
+            </button>
+            <button
+              type="button"
+              onClick={() => { setMode("view"); setEditError(null); }}
+              className="rounded-lg border border-line-2 text-xs font-semibold text-ink-2 px-3 py-2"
+            >
+              Cancel
+            </button>
+          </div>
+        </form>
+      )}
+
+      {mode === "confirmDelete" && (
+        <div className="pt-1 border-t border-line space-y-2">
+          <p className="text-xs text-accent-red font-semibold">Delete this fixture? This cannot be undone.</p>
+          <div className="flex gap-2">
+            <button
+              onClick={handleDelete}
+              disabled={pending}
+              className="flex-1 rounded-lg bg-accent-red text-white text-xs font-semibold py-2 disabled:opacity-50"
+            >
+              {pending ? "Deleting…" : "Yes, delete"}
+            </button>
+            <button
+              onClick={() => setMode("view")}
+              className="rounded-lg border border-line-2 text-xs font-semibold text-ink-2 px-3 py-2"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function KnockoutResultsTab({ matches, teamNames }: {
   matches: Match[];
   teamNames: Record<string, string>;
@@ -308,6 +506,8 @@ export function KnockoutResultsTab({ matches, teamNames }: {
     },
     initState
   );
+
+  const labelIdx = buildLabelIndex(matches);
 
   const byStage = STAGES.map(s => ({
     ...s,
@@ -325,11 +525,16 @@ export function KnockoutResultsTab({ matches, teamNames }: {
             <option value="">— select round —</option>
             {STAGES.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
           </select>
+          <datalist id="team-codes-list">
+            {Object.entries(teamNames).map(([code, name]) => (
+              <option key={code} value={code}>{name}</option>
+            ))}
+          </datalist>
           <div className="flex gap-2">
-            <input name="home_team_code" type="text" placeholder="Home code (optional if feed set)"
+            <input name="home_team_code" type="text" list="team-codes-list" placeholder="Home code (blank = TBD)"
               className="flex-1 rounded-lg bg-paper-2 border border-line-2 px-3 py-2.5 text-sm font-mono text-ink placeholder:text-ink-3 focus:outline-none focus:ring-1 focus:ring-brand min-h-tap" />
             <span className="self-center text-ink-3 text-sm">vs</span>
-            <input name="away_team_code" type="text" placeholder="Away code"
+            <input name="away_team_code" type="text" list="team-codes-list" placeholder="Away code (blank = TBD)"
               className="flex-1 rounded-lg bg-paper-2 border border-line-2 px-3 py-2.5 text-sm font-mono text-ink placeholder:text-ink-3 focus:outline-none focus:ring-1 focus:ring-brand min-h-tap" />
           </div>
           <input name="kickoff_utc" type="text" placeholder="2026-06-28T22:00:00Z" required
@@ -348,7 +553,7 @@ export function KnockoutResultsTab({ matches, teamNames }: {
                     className="w-full rounded-lg bg-paper-2 border border-line-2 px-2 py-2 text-xs text-ink focus:outline-none focus:ring-1 focus:ring-brand">
                     <option value="">— none —</option>
                     {matches.map(m => (
-                      <option key={m.id} value={m.id}>{matchOptionLabel(m, teamNames)}</option>
+                      <option key={m.id} value={m.id}>{matchOptionLabel(m, labelIdx)}</option>
                     ))}
                   </select>
                 </div>
@@ -358,7 +563,7 @@ export function KnockoutResultsTab({ matches, teamNames }: {
                     className="w-full rounded-lg bg-paper-2 border border-line-2 px-2 py-2 text-xs text-ink focus:outline-none focus:ring-1 focus:ring-brand">
                     <option value="">— none —</option>
                     {matches.map(m => (
-                      <option key={m.id} value={m.id}>{matchOptionLabel(m, teamNames)}</option>
+                      <option key={m.id} value={m.id}>{matchOptionLabel(m, labelIdx)}</option>
                     ))}
                   </select>
                 </div>
@@ -376,7 +581,7 @@ export function KnockoutResultsTab({ matches, teamNames }: {
       </div>
 
       {/* Bracket wiring for existing matches */}
-      <BracketWiringSection matches={matches} teamNames={teamNames} />
+      <BracketWiringSection matches={matches} labelIdx={labelIdx} />
 
       {/* Existing knockout matches by stage */}
       {byStage.filter(s => s.matches.length > 0).map(stage => (
@@ -385,13 +590,7 @@ export function KnockoutResultsTab({ matches, teamNames }: {
             {stage.label}
           </h3>
           {stage.matches.map(match => (
-            <div key={match.id} className="rounded-xl bg-paper-2 border border-line p-4">
-              <MatchResultForm
-                match={match}
-                homeTeam={teamNames[match.home_team_code ?? ""] ?? match.home_team_code ?? "TBD"}
-                awayTeam={teamNames[match.away_team_code ?? ""] ?? match.away_team_code ?? "TBD"}
-              />
-            </div>
+            <KnockoutMatchCard key={match.id} match={match} teamNames={teamNames} labelIdx={labelIdx} />
           ))}
         </div>
       ))}

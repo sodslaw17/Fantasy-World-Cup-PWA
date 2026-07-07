@@ -65,7 +65,7 @@ export function DemoDataControls() {
       )}
 
       {result === "success" && log.length > 0 && (
-        <div className="text-xs text-paper/50 space-y-1">
+        <div className="text-xs text-ink-2 space-y-1">
           <p>Switch between phase views using <strong>Phase Override</strong> above:</p>
           <ul className="list-disc pl-4 space-y-0.5">
             <li><strong>groups</strong> — leaderboard with predictions &amp; results</li>

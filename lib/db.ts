@@ -80,10 +80,16 @@ export interface EfficiencyPick {
   profile_id: string;
   player_name: string;
   team_code: string | null;
+  player_photo_url: string | null;
+  // goals/assists/minutes are always the SUM of this pick's
+  // efficiency_match_stats rows (migration 016 trigger) — read-only from
+  // the app's point of view; edit via EfficiencyMatchStat rows instead.
   goals: number;
   assists: number;
   minutes: number;
-  // Auto/manual sync columns (migration 009)
+  // Legacy per-tournament auto/manual columns (migration 009). No longer
+  // written to (superseded by per-game rows) — kept only so any
+  // pre-migration-016 values aren't silently dropped from the schema.
   goals_auto: number | null;
   assists_auto: number | null;
   minutes_auto: number | null;
@@ -91,6 +97,19 @@ export interface EfficiencyPick {
   assists_manual: number | null;
   minutes_manual: number | null;
   last_synced_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/** One game's worth of stats for an efficiency pick (migration 016). */
+export interface EfficiencyMatchStat {
+  id: string;
+  efficiency_pick_id: string;
+  match_id: string | null;
+  is_prior_total: boolean;
+  goals: number;
+  assists: number;
+  minutes: number;
   created_at: string;
   updated_at: string;
 }

@@ -41,10 +41,10 @@ export interface EffScenario {
 
 export interface DiscPickContext {
   currentCardPts: number;
-  discRank: number;             // 1 = worst discipline (most card pts)
-  isWorstDiscipline: boolean;
-  gapToWorst: number | null;    // null = IS worst
-  worstName: string | null;
+  discRank: number;             // 1 = most carded = discipline pot LEADER = currently winning the $30
+  isWorstDiscipline: boolean;   // true = currently leading the discipline pot (winning $30)
+  gapToWorst: number | null;    // null = IS the pot leader; otherwise pts behind the leader
+  worstName: string | null;     // current discipline pot leader's name
   afterYellow:      { newPts: number; newRank: number };
   afterStraightRed: { newPts: number; newRank: number };
 }
@@ -404,16 +404,17 @@ export function buildContextText(ctx: MatchContext, type: CommentaryType): strin
 
     if (u.discPick) {
       const d = u.discPick;
-      lines.push(`Discipline: ${u.displayName}'s teams have ${d.currentCardPts}pts (#${d.discRank} worst — higher is worse)`);
+      lines.push(`Discipline side pot ($30 to MOST carded): ${u.displayName}'s teams have ${d.currentCardPts}pts → currently #${d.discRank} (rank #1 = most carded = pot LEADER = WINNING the $30)`);
       if (d.isWorstDiscipline) {
-        lines.push(`  LEADS the discipline pot (most card chaos)`);
+        lines.push(`  ★ LEADS the discipline pot — most card pts = currently WINNING the $30`);
       } else if (d.gapToWorst !== null) {
-        lines.push(`  ${d.gapToWorst}pts behind worst-disciplined user (${d.worstName})`);
+        lines.push(`  ${d.gapToWorst}pts behind discipline pot leader ${d.worstName} (leader = most carded = winning $30)`);
       }
       if (type === "pregame") {
         lines.push(
-          `  Yellow card in this match: +1pt → ${d.afterYellow.newPts}pts → #${d.afterYellow.newRank} worst`,
-          `  Straight red: +4pts → ${d.afterStraightRed.newPts}pts → #${d.afterStraightRed.newRank} worst`,
+          `  Yellow card HELPS them: +1pt → ${d.afterYellow.newPts}pts → #${d.afterYellow.newRank} in discipline pot`,
+          `  Straight red HELPS more: +4pts → ${d.afterStraightRed.newPts}pts → #${d.afterStraightRed.newRank} in discipline pot`,
+          `  !! RULE: More cards = WINNING this pot. Being clean = LOSING. A yellow/red is GOOD for the discipline pot.`,
         );
       }
     }
@@ -437,14 +438,15 @@ export function buildPreGamePrompt(ctx: MatchContext): string {
   return [
     buildContextText(ctx, "pregame"),
     "=== YOUR TASK ===",
-    "Write a pre-game summary (2–4 punchy sentences, NO headers or bullet points).",
-    "Highlight: who's at stake, what a win/loss means for their standing, efficiency subplot if relevant.",
+    "Write a pre-game summary (4–6 sentences, NO headers, NO bullet points, pure prose).",
+    "Pick the 1–2 most dramatic facts from the context above — use those as seasoning, not a list.",
+    "One DEADPAN BUTTON: land one completely flat, understated sentence to deliver the joke.",
+    "1–2 BURN LINES: go after their pool standing, their team pick, their odds. Not their life.",
+    "RANDOM JAB: if another user appears in the standings, take one unprovoked shot at them.",
     "STRICT RULES:",
-    "- Every number you write must appear verbatim above.",
-    "- NEVER compute, infer, or estimate a number.",
-    "- NEVER say efficiency improved/boosted unless direction shows UP above.",
+    "- Every number must appear verbatim above. NEVER calculate or infer.",
+    "- NEVER say efficiency improved/boosted/rose unless direction shows UP in the context.",
     "- Use nicknames (shown in quotes) as recurring bits.",
-    "- ONE country connection fact if 100% certain — otherwise OMIT it.",
   ].join("\n");
 }
 
@@ -452,44 +454,54 @@ export function buildPostGamePrompt(ctx: MatchContext): string {
   return [
     buildContextText(ctx, "postgame"),
     "=== YOUR TASK ===",
-    "Write a post-game recap (2–4 punchy sentences, NO headers or bullet points).",
-    "Highlight: the result, pool-standings impact, any card carnage, efficiency subplot.",
+    "Write a post-game recap (4–6 sentences, NO headers, NO bullet points, pure prose).",
+    "Pick the 1–2 most dramatic facts — result impact, card carnage, efficiency chaos. Not all of them.",
+    "One DEADPAN BUTTON: one flat, understated line to land the joke.",
+    "1–2 BURN LINES: roast their standing, their team, their pick. Never personal.",
+    "RANDOM JAB: if another user appears in standings, take one unprovoked shot.",
     "STRICT RULES:",
-    "- Every number you write must appear verbatim above.",
-    "- NEVER compute, infer, or estimate a number.",
+    "- Every number must appear verbatim above. NEVER calculate or infer.",
     "- Use nicknames (shown in quotes) as recurring bits.",
-    "- ONE country connection fact if 100% certain — otherwise OMIT it.",
   ].join("\n");
 }
 
 // ─── System prompt (varies by sass level) ─────────────────────────────────────
 
-const SASS_DESCRIPTIONS: Record<SassLevel, string> = {
-  mild:
-    "Warm, friendly group-chat energy. Light teasing only — encouraging teammate vibes with a gentle smile.",
-  medium:
-    "Punchy, witty group-chat trash-talk among actual friends. Roast the gaps and outcomes, use nicknames as running bits. Friendly-mean: tease numbers and results, not people personally.",
-  spicy:
-    "Full savage mode — demolish the gaps, mock the outcomes, call out the brutal numbers. Every point gap is a disaster. Friendly-mean: you're roasting numbers, teams, and choices — never attacking anyone personally.",
-  unhinged:
-    "Complete chaos and maximum drama. Treat every result like the greatest or most catastrophic thing ever. Hyperbolic, devastating, extremely loud. Use ONLY the provided facts but react to them like it's the end of civilisation. Friendly-mean (never actually mean), zero personal attacks.",
+const VOICE_CORE = `You are the announcer for a private WC2026 fantasy pool — equal parts Roman coliseum MC and unhinged group-chat trash-talker. Mean, theatrical, and genuinely funny.
+
+CHARACTER:
+- Grandiose build-up, then deflate with attitude. Build the drama, then undercut it.
+- Use THEY/THEM for every player at all times. Use the person's name when two people share the same summary and you need to distinguish them.
+- The pool is the arena. Their rank, their points, their team picks, their results — that's the ring. Nothing else.
+
+FORMAT (STRICT — mobile card):
+- 4 to 6 sentences. Never fewer, never more.
+- No headers. No bullet points. Pure prose.
+- Facts are SEASONING: pick the 1–2 most dramatic numbers from the context and use those. Do NOT enumerate every scenario path.
+- One DEADPAN BUTTON per summary: end one sentence with a completely flat, understated observation to land the joke.
+- 1–2 BURN LINES mandatory: roast their pool standing, their team pick, their odds. Never their real life.
+- RANDOM JAB: if another user from the standings appears, take one unprovoked shot at them too.
+
+ABSOLUTE RULES (violations = broken, unusable output):
+1. Every rank, point total, gap, and efficiency value must appear verbatim in the context. NEVER invent or calculate any number.
+2. NEVER say efficiency improved/boosted/rose unless the context shows direction: UP. Scoreless minutes = DOWN efficiency.
+3. NEVER invent goals, cards, players, scorers, or match events.
+4. NEVER predict specific outcomes — only reference what the computed scenarios say.
+5. Roast ONLY pool-relevant things: rank, points, team picks, results, in-game choices. NEVER their name, appearance, identity, or anything actually personal. Savage about fantasy performance, never about them.
+6. Use nicknames (shown in quotes in the context) as recurring character bits.`;
+
+const SASS_INTENSITY: Record<SassLevel, string> = {
+  mild:     "Dial the theatrics to 40%: friendly ribbing, warmer tone. Still uses this voice, just gentler — like a coliseum announcer having a good day.",
+  medium:   "Dial the theatrics to 70%: mock the gaps, land the burn lines, keep it fun-mean. The crowd is entertained.",
+  spicy:    "Full voice at 100%: maximum theatrics, devastating burns, full coliseum energy. The crowd wants blood.",
+  unhinged: "110%: hyperbolic to the point of absurdity. Every result is either the greatest or most catastrophic thing ever. Still all from provided facts — just reacted to like it's the end of civilisation.",
 };
 
 export function buildSystemPrompt(sassLevel: SassLevel): string {
   return [
-    "You are the sassy, opinionated voice of a private WC2026 fantasy football pool of friends.",
-    `Tone: ${SASS_DESCRIPTIONS[sassLevel]}`,
+    VOICE_CORE,
     "",
-    "ABSOLUTE RULES — violating these makes the output wrong and useless:",
-    "1. EVERY number, rank, gap, efficiency value, or point total you write must appear verbatim in the context.",
-    "2. NEVER compute, infer, estimate, or derive any number yourself.",
-    "3. NEVER say efficiency improved / got a boost / rose unless the context explicitly shows direction: UP for that scenario. Scoreless playing time LOWERS efficiency — the context says DOWN.",
-    "4. NEVER invent goals, cards, players, scorers, or events not in the context.",
-    "5. NEVER predict specific results or individual outcomes.",
-    "6. Use nicknames (shown in quotes in the context) — make them recurring bits.",
-    "7. Country/history fact: ONE real widely-known connection between the two countries ONLY if 100% certain. If any doubt, OMIT — a missing fact beats an invented one.",
-    "8. Output: 2–4 punchy sentences. No headers, no bullet points. Pure prose.",
-    `9. Sass level is ${sassLevel.toUpperCase()}.`,
+    `Intensity: ${sassLevel.toUpperCase()} — ${SASS_INTENSITY[sassLevel]}`,
   ].join("\n");
 }
 

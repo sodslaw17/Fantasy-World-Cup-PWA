@@ -13,8 +13,8 @@ export async function saveMatchResult(formData: FormData): Promise<ActionResult>
   const matchId        = formData.get("match_id") as string;
   const homeGoals      = parseInt(formData.get("home_goals") as string);
   const awayGoals      = parseInt(formData.get("away_goals") as string);
-  const wentToET       = formData.get("went_to_et") === "true";
-  const wentToShootout = formData.get("went_to_shootout") === "true";
+  const wentToET       = formData.getAll("went_to_et").includes("true");
+  const wentToShootout = formData.getAll("went_to_shootout").includes("true");
   const shootoutWinner = (formData.get("shootout_winner") as string) || null;
 
   if (isNaN(homeGoals) || isNaN(awayGoals) || homeGoals < 0 || awayGoals < 0) {
@@ -67,6 +67,8 @@ export async function saveMatchResult(formData: FormData): Promise<ActionResult>
 
   revalidatePath("/admin/results");
   revalidatePath("/");
+  revalidatePath("/bracket");
+  revalidatePath("/today");
   return { success: true };
 }
 
@@ -101,16 +103,61 @@ export async function createKnockoutMatch(formData: FormData): Promise<ActionRes
   return { success: true };
 }
 
+/** Edit the teams and kickoff time of an existing knockout match. */
+export async function updateKnockoutMatch(formData: FormData): Promise<ActionResult> {
+  const matchId      = formData.get("match_id") as string;
+  const homeTeamCode = (formData.get("home_team_code") as string)?.trim().toUpperCase() || null;
+  const awayTeamCode = (formData.get("away_team_code") as string)?.trim().toUpperCase() || null;
+  const kickoffUtc   = (formData.get("kickoff_utc") as string)?.trim();
+
+  if (!kickoffUtc || isNaN(Date.parse(kickoffUtc))) {
+    return { error: "A valid UTC kickoff time is required (e.g. 2026-07-01T19:00:00Z)." };
+  }
+
+  const service = createServiceClient();
+  const { error } = await service
+    .from("matches")
+    .update({ home_team_code: homeTeamCode, away_team_code: awayTeamCode, kickoff_utc: kickoffUtc })
+    .eq("id", matchId)
+    .neq("stage", "group");
+
+  if (error) return { error: error.message };
+  revalidatePath("/admin/results");
+  revalidatePath("/bracket");
+  revalidatePath("/today");
+  return { success: true };
+}
+
+/** Delete a knockout match. Guard prevents deleting group-stage matches. */
+export async function deleteKnockoutMatch(matchId: string): Promise<ActionResult> {
+  const service = createServiceClient();
+  const { error } = await service
+    .from("matches")
+    .delete()
+    .eq("id", matchId)
+    .neq("stage", "group");
+
+  if (error) return { error: error.message };
+  revalidatePath("/admin/results");
+  revalidatePath("/bracket");
+  revalidatePath("/today");
+  return { success: true };
+}
+
 /** Set bracket progression wiring for a knockout match (which earlier matches feed each slot). */
 export async function setMatchFeeds(
   matchId: string,
   homeFeedId: string | null,
-  awayFeedId: string | null
+  awayFeedId: string | null,
+  homeFeedOutcome: 'winner' | 'loser' = 'winner',
+  awayFeedOutcome: 'winner' | 'loser' = 'winner'
 ): Promise<ActionResult> {
   const service = createServiceClient();
   const { error } = await service.from("matches").update({
     home_feed_match_id: homeFeedId || null,
     away_feed_match_id: awayFeedId || null,
+    home_feed_outcome: homeFeedOutcome,
+    away_feed_outcome: awayFeedOutcome,
   }).eq("id", matchId);
 
   if (error) return { error: error.message };

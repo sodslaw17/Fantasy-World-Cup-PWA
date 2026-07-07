@@ -56,18 +56,18 @@ export default async function PayoutsPage() {
     penaltyEvents ?? []
   );
 
-  // Efficiency leaderboard
+  // Efficiency leaderboard — map over ALL profiles so users without a pick still appear
   const efficiencyBoard = computeEfficiencyLeaderboard(
-    (effPicks ?? []).map((p) => {
-      const prof = profiles?.find((pr) => pr.id === p.profile_id);
+    (profiles ?? []).map((prof) => {
+      const pick = (effPicks ?? []).find((p) => p.profile_id === prof.id);
       return {
-        profileId: p.profile_id,
-        displayName: prof?.display_name ?? "Unknown",
-        playerName: p.player_name,
-        teamCode: p.team_code,
-        goals: p.goals,
-        assists: p.assists,
-        minutes: p.minutes,
+        profileId: prof.id,
+        displayName: prof.display_name ?? "Unknown",
+        playerName: pick?.player_name ?? "",
+        teamCode: pick?.team_code ?? null,
+        goals: pick?.goals ?? 0,
+        assists: pick?.assists ?? 0,
+        minutes: pick?.minutes ?? 0,
       };
     })
   );
@@ -84,12 +84,15 @@ export default async function PayoutsPage() {
   const tournamentComplete = finalMatch?.status === "finished";
 
   return (
-    <div className="min-h-screen pb-24">
-      <header className="px-4 pt-5 pb-3">
-        <h1 className="text-lg font-bold text-gold">Payouts</h1>
-        <p className="text-xs text-paper/50">$300 total pool · $30 buy-in × 10 players</p>
+    <div className="flex flex-col h-dvh">
+      <header className="bg-surface pt-[calc(env(safe-area-inset-top)+8px)]">
+        <div className="px-5 pt-2.5 pb-3">
+          <div className="text-ink-2 text-[13px] font-semibold mb-0.5">$300 total pool · $30 buy-in × 10 players</div>
+          <h1 className="m-0 font-display font-bold uppercase tracking-[.005em] leading-none text-ink text-[28px]">Payouts</h1>
+        </div>
+        <div className="h-px bg-line" />
       </header>
-      <div className="px-4">
+      <div className="flex-1 overflow-y-auto px-3.5 py-3 pb-[calc(env(safe-area-inset-bottom)+74px)] flex flex-col gap-3">
         <PayoutsSummary
           overall={overallBoard}
           efficiency={efficiencyBoard}

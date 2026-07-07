@@ -2,7 +2,7 @@
 
 import { useActionState, useState } from "react";
 import { addUser, updateDisplayName, updateAvatar, deleteUser } from "@/app/admin/users/actions";
-import { Avatar } from "@/components/ui/Avatar";
+import { ImageUpload } from "@/components/ui/ImageUpload";
 import type { Profile } from "@/lib/db";
 
 const initialAddState = { error: undefined as string | undefined, success: false };
@@ -19,22 +19,22 @@ export function UserTable({ profiles }: { profiles: Profile[] }) {
   return (
     <div className="space-y-6">
       {/* Add user form */}
-      <div className="rounded-xl bg-ink-soft border border-paper/10 p-4 space-y-3">
-        <h2 className="text-sm font-semibold text-gold">Add player</h2>
+      <div className="rounded-xl bg-paper-2 border border-line p-4 space-y-3">
+        <h2 className="text-sm font-semibold text-gold-ink">Add player</h2>
         <form action={addAction} className="flex flex-col gap-2 sm:flex-row">
           <input
             name="email"
             type="email"
             required
             placeholder="Email"
-            className="flex-1 rounded-lg bg-ink border border-paper/20 px-3 py-2.5 text-sm text-paper placeholder:text-paper/40 focus:outline-none focus:ring-1 focus:ring-gold min-h-tap"
+            className="flex-1 rounded-lg bg-paper-2 border border-line-2 px-3 py-2.5 text-sm text-ink placeholder:text-ink-3 focus:outline-none focus:ring-1 focus:ring-brand min-h-tap"
           />
           <input
             name="display_name"
             type="text"
             required
             placeholder="Display name"
-            className="flex-1 rounded-lg bg-ink border border-paper/20 px-3 py-2.5 text-sm text-paper placeholder:text-paper/40 focus:outline-none focus:ring-1 focus:ring-gold min-h-tap"
+            className="flex-1 rounded-lg bg-paper-2 border border-line-2 px-3 py-2.5 text-sm text-ink placeholder:text-ink-3 focus:outline-none focus:ring-1 focus:ring-brand min-h-tap"
           />
           <button
             type="submit"
@@ -53,9 +53,9 @@ export function UserTable({ profiles }: { profiles: Profile[] }) {
       </div>
 
       {/* Players list */}
-      <div className="rounded-xl bg-ink-soft border border-paper/10 overflow-hidden">
+      <div className="rounded-xl bg-paper-2 border border-line overflow-hidden">
         {profiles.length === 0 ? (
-          <p className="p-4 text-sm text-paper/50">No players yet.</p>
+          <p className="p-4 text-sm text-ink-2">No players yet.</p>
         ) : (
           <ul className="divide-y divide-paper/10">
             {profiles.map((p) => (
@@ -65,7 +65,7 @@ export function UserTable({ profiles }: { profiles: Profile[] }) {
         )}
       </div>
 
-      <p className="text-xs text-paper/30">
+      <p className="text-xs text-ink-3">
         {profiles.length} / 10 players
       </p>
     </div>
@@ -76,13 +76,11 @@ function PlayerRow({ profile }: { profile: Profile }) {
   const [editing, setEditing] = useState(false);
   const [editName, setEditName] = useState(profile.display_name);
   const [editError, setEditError] = useState<string>();
-  const [editingAvatar, setEditingAvatar] = useState(false);
-  const [avatarUrl, setAvatarUrl] = useState(profile.avatar_url ?? "");
-  const [avatarMsg, setAvatarMsg] = useState<string>();
+  const [avatarMsg, setAvatarMsg] = useState("");
   const [deleting, setDeleting] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState(false);
 
-  async function handleSave() {
+  async function handleSaveName() {
     const result = await updateDisplayName(profile.id, editName);
     if (result.error) {
       setEditError(result.error);
@@ -92,11 +90,11 @@ function PlayerRow({ profile }: { profile: Profile }) {
     }
   }
 
-  async function handleSaveAvatar() {
-    const result = await updateAvatar(profile.id, avatarUrl);
-    setAvatarMsg(result.error ?? "Saved");
-    if (!result.error) setEditingAvatar(false);
-    setTimeout(() => setAvatarMsg(undefined), 3000);
+  async function handleAvatarComplete(url: string | null) {
+    const result = await updateAvatar(profile.id, url ?? "");
+    if (result.error) setAvatarMsg(result.error);
+    else setAvatarMsg("Saved");
+    setTimeout(() => setAvatarMsg(""), 3000);
   }
 
   async function handleDelete() {
@@ -110,17 +108,26 @@ function PlayerRow({ profile }: { profile: Profile }) {
 
   return (
     <li className="p-4 flex items-start gap-3">
-      {/* Avatar */}
-      <div className="shrink-0 flex flex-col items-center gap-1">
-        <Avatar name={profile.display_name} url={profile.avatar_url} size="md" />
-        <button onClick={() => setEditingAvatar(!editingAvatar)}
-          className="text-xs text-paper/30 hover:text-gold">
-          {editingAvatar ? "cancel" : "photo"}
-        </button>
+      {/* Avatar upload */}
+      <div className="shrink-0">
+        <ImageUpload
+          bucket="avatars"
+          storagePath={profile.id}
+          currentUrl={profile.avatar_url}
+          shape="circle"
+          size="md"
+          onComplete={handleAvatarComplete}
+        />
+        {avatarMsg && (
+          <p className={`text-xs mt-1 text-center ${avatarMsg === "Saved" ? "text-accent-green" : "text-accent-red"}`}>
+            {avatarMsg === "Saved" ? "✓" : avatarMsg}
+          </p>
+        )}
       </div>
+
       {/* Status dot */}
       <span
-        className={`mt-1 w-2 h-2 rounded-full flex-shrink-0 ${
+        className={`mt-1.5 w-2 h-2 rounded-full flex-shrink-0 ${
           profile.auth_id ? "bg-accent-green" : "bg-paper/20"
         }`}
         title={profile.auth_id ? "Logged in at least once" : "Never logged in"}
@@ -132,18 +139,18 @@ function PlayerRow({ profile }: { profile: Profile }) {
             <input
               value={editName}
               onChange={(e) => setEditName(e.target.value)}
-              className="flex-1 rounded bg-ink border border-paper/20 px-2 py-1 text-sm text-paper focus:outline-none focus:ring-1 focus:ring-gold"
+              className="flex-1 rounded bg-paper-2 border border-line-2 px-2 py-1 text-sm text-ink focus:outline-none focus:ring-1 focus:ring-brand"
               autoFocus
             />
             <button
-              onClick={handleSave}
-              className="text-xs text-gold font-medium px-2 py-1 rounded hover:bg-gold/10"
+              onClick={handleSaveName}
+              className="text-xs text-gold-ink font-medium px-2 py-1 rounded hover:bg-gold-soft"
             >
               Save
             </button>
             <button
               onClick={() => { setEditing(false); setEditName(profile.display_name); setEditError(undefined); }}
-              className="text-xs text-paper/50 px-2 py-1 rounded hover:bg-paper/5"
+              className="text-xs text-ink-2 px-2 py-1 rounded hover:bg-paper/5"
             >
               Cancel
             </button>
@@ -152,30 +159,14 @@ function PlayerRow({ profile }: { profile: Profile }) {
           <p className="text-sm font-medium">{profile.display_name}</p>
         )}
         {editError && <p className="text-xs text-accent-red mt-1">{editError}</p>}
-        <p className="text-xs text-paper/50 mt-0.5 truncate">{profile.email}</p>
-        {editingAvatar && (
-          <div className="flex gap-2 mt-2">
-            <input value={avatarUrl} onChange={(e) => setAvatarUrl(e.target.value)}
-              placeholder="https://… (photo URL)"
-              className="flex-1 rounded bg-ink border border-paper/20 px-2 py-1 text-xs text-paper focus:outline-none focus:ring-1 focus:ring-gold" />
-            <button onClick={handleSaveAvatar}
-              className="text-xs text-gold font-medium px-2 py-1 rounded hover:bg-gold/10">
-              Save
-            </button>
-          </div>
-        )}
-        {avatarMsg && (
-          <p className={`text-xs mt-1 ${avatarMsg === "Saved" ? "text-accent-green" : "text-accent-red"}`}>
-            {avatarMsg}
-          </p>
-        )}
+        <p className="text-xs text-ink-2 mt-0.5 truncate">{profile.email}</p>
       </div>
 
       <div className="flex gap-2 flex-shrink-0">
         {!editing && (
           <button
             onClick={() => setEditing(true)}
-            className="text-xs text-paper/50 hover:text-paper px-2 py-1 rounded hover:bg-paper/5"
+            className="text-xs text-ink-2 hover:text-ink px-2 py-1 rounded hover:bg-paper/5"
           >
             Edit
           </button>
@@ -186,7 +177,7 @@ function PlayerRow({ profile }: { profile: Profile }) {
           className={`text-xs px-2 py-1 rounded ${
             deleteConfirm
               ? "text-accent-red font-semibold hover:bg-accent-red/10"
-              : "text-paper/50 hover:text-paper hover:bg-paper/5"
+              : "text-ink-2 hover:text-ink hover:bg-paper/5"
           }`}
         >
           {deleting ? "…" : deleteConfirm ? "Confirm?" : "Remove"}

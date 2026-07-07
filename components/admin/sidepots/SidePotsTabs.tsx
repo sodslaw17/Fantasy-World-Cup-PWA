@@ -22,11 +22,11 @@ export function SidePotsTabs({
 
   return (
     <div className="space-y-4">
-      <div className="flex gap-1 bg-ink-soft rounded-lg p-1 w-fit">
+      <div className="flex gap-1 bg-paper-2 rounded-lg p-1 w-fit">
         {tabs.map((t) => (
           <button key={t.id} onClick={() => setTab(t.id)}
             className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-              tab === t.id ? "bg-gold text-ink" : "text-paper/60 hover:text-paper"
+              tab === t.id ? "bg-gold text-ink" : "text-ink-2 hover:text-ink"
             }`}>
             {t.label}
           </button>

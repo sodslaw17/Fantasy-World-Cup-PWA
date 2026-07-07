@@ -30,14 +30,14 @@ export function Avatar({
       <img
         src={url}
         alt={name}
-        className={`${sizeClass} rounded-full object-cover border border-paper/20 shrink-0 ${className}`}
+        className={`${sizeClass} rounded-full object-cover border border-line shrink-0 ${className}`}
       />
     );
   }
 
   return (
     <div
-      className={`${sizeClass} rounded-full bg-gold/20 border border-gold/30 flex items-center justify-center font-bold text-gold shrink-0 ${className}`}
+      className={`${sizeClass} rounded-full bg-blue-soft border border-line flex items-center justify-center font-bold text-blue-ink shrink-0 ${className}`}
       title={name}
     >
       {initials}

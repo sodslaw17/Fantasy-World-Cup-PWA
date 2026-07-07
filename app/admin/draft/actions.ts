@@ -39,6 +39,22 @@ export async function setUserDraft(
   }
 
   revalidatePath("/admin/draft");
+  revalidatePath("/my-team");
+  return { success: true };
+}
+
+/** Unlock the draft so admins can reassign picks. */
+export async function unlockDraft(): Promise<ActionResult> {
+  const service = createServiceClient();
+  const { error } = await service
+    .from("settings")
+    .update({ draft_locked: false })
+    .eq("singleton", true);
+
+  if (error) return { error: error.message };
+
+  revalidatePath("/admin/draft");
+  revalidatePath("/");
   return { success: true };
 }
 

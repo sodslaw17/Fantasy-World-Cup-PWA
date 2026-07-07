@@ -43,25 +43,26 @@ export default async function DisciplinePage() {
     .sort((a, b) => b.total - a.total);
 
   return (
-    <div className="min-h-screen pb-28">
-      <header className="px-4 pt-5 pb-3">
-        <h1 className="text-lg font-bold text-gold">Team Discipline</h1>
-        <p className="text-xs text-paper/50">Total card points — all tournament matches</p>
+    <div className="flex flex-col h-dvh">
+      <header className="bg-surface pt-[calc(env(safe-area-inset-top)+8px)]">
+        <div className="px-5 pt-2.5 pb-3">
+          <div className="text-ink-2 text-[13px] font-semibold mb-0.5">All tournament matches</div>
+          <h1 className="m-0 font-display font-bold uppercase tracking-[.005em] leading-none text-ink text-[28px]">Discipline</h1>
+        </div>
+        <div className="h-px bg-line" />
       </header>
-      <div className="px-4">
+      <div className="flex-1 overflow-y-auto px-3.5 py-3 pb-[calc(env(safe-area-inset-bottom)+74px)] flex flex-col gap-2">
         {rows.length === 0 ? (
-          <p className="text-sm text-paper/40 text-center py-12">
-            No card data entered yet.
-          </p>
+          <p className="text-sm text-ink-3 text-center py-12">No card data entered yet.</p>
         ) : (
-          <div className="space-y-1.5">
+          <>
             {rows.map((t, i) => (
               <div key={t.fifaCode}
-                className="flex items-center gap-3 rounded-xl bg-ink-soft border border-paper/10 px-4 py-3">
-                <span className="text-xs text-paper/40 w-5 tabular-nums shrink-0">{i + 1}</span>
+                className="flex items-center gap-3 rounded-xl bg-surface border border-line px-4 py-3">
+                <span className="text-xs text-ink-3 w-5 tabular-nums shrink-0">{i + 1}</span>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium truncate">{t.name}</p>
-                  <p className="text-xs text-paper/40">
+                  <p className="text-sm font-medium text-ink truncate">{t.name}</p>
+                  <p className="text-xs text-ink-3">
                     {t.groupLetter ? `Group ${t.groupLetter}` : "Knockout"}
                     {" · "}
                     {t.yellows > 0 && `🟨×${t.yellows} `}
@@ -69,16 +70,16 @@ export default async function DisciplinePage() {
                     {t.straightReds > 0 && `🟥×${t.straightReds}`}
                   </p>
                 </div>
-                <span className="text-lg font-black text-accent-red tabular-nums shrink-0">
+                <span className="font-num text-lg font-black text-red-ink tabular-nums shrink-0">
                   {t.total}
                 </span>
               </div>
             ))}
-          </div>
+            <p className="text-xs text-ink-3 text-center py-1">
+              1st yellow = 1 pt · 2nd yellow = 2 pts · straight red = 4 pts
+            </p>
+          </>
         )}
-        <p className="text-xs text-paper/30 text-center mt-4">
-          1st yellow = 1 pt · 2nd yellow = 2 pts · straight red = 4 pts
-        </p>
       </div>
     </div>
   );

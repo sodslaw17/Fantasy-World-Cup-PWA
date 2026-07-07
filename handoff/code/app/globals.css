@@ -1,0 +1,225 @@
+/* ============================================================
+   WC2026 Fantasy — globals.css
+   CANONICAL DESIGN TOKENS  ·  Tailwind v4  ·  TRIONDA system
+   ------------------------------------------------------------
+   This file is the single source of truth for every token.
+   No component may hard-code a hex value — everything resolves
+   through a token defined here and exposed as a Tailwind utility
+   via the `@theme inline` block at the bottom.
+
+   WHERE TOKENS LIVE
+   - Tailwind v4 (this file): raw values in :root / [data-base="dark"],
+     surfaced to utilities through `@theme inline`. There is no
+     tailwind.config.js for design tokens.
+   - Tailwind v3 (if you are on v3 instead): delete the `@import`
+     and `@theme` blocks here, keep the :root / [data-base]/[data-flag]
+     custom-property blocks exactly as-is, and mirror the same names
+     into `theme.extend` in tailwind.config.js (colors/borderRadius/
+     boxShadow/fontFamily). The custom-property values below do not
+     change between v3 and v4 — only the wiring does.
+   ============================================================ */
+
+@import "tailwindcss";
+
+/* Dark mode is attribute-driven (data-base="dark") so the prototype's
+   Tweaks switch and the production theme store use the same selector.
+   This makes `dark:` utilities respond to [data-base="dark"]. */
+@custom-variant dark (&:where([data-base="dark"], [data-base="dark"] *));
+
+/* ------------------------------------------------------------
+   FONTS
+   Preferred: next/font (self-hosted, no layout shift). See
+   app/fonts.ts and how it's applied in app/layout.tsx in the
+   handoff. The @font-face fallback below is only for non-Next
+   contexts; if you use next/font you do NOT need these.
+
+   Families & weights:
+     Hanken Grotesk  400 500 600 700 800   → --font-body
+     Saira Condensed 500 600 700           → --font-display (titles, UPPERCASE)
+     Saira           500 600 700           → --font-num     (all numerals, tabular)
+     Oswald / Archivo                       → optional display swaps (Tweak only)
+------------------------------------------------------------ */
+
+:root {
+  /* ---- type ---- */
+  --font-body:    "Hanken Grotesk", system-ui, -apple-system, sans-serif;
+  --font-display: "Saira Condensed", "Hanken Grotesk", sans-serif;
+  --font-num:     "Saira", "Hanken Grotesk", sans-serif;
+
+  /* ---- neutral base (FIXED — never themed per-user) ---- */
+  --paper:   #FFFFFF;   /* app background base            */
+  --paper-2: #F5F6F9;   /* subtle raised fill / zebra rows */
+  --paper-3: #ECEEF3;   /* inset / chip fill              */
+  --surface: #FFFFFF;   /* card surface                   */
+  --stage:   #EAECF1;   /* canvas BEHIND the app/phone — REQUIRED, do not drop */
+  --ink:   #14151A;     /* primary text     */
+  --ink-2: #565D6E;     /* secondary text   */
+  --ink-3: #8A90A0;     /* tertiary / muted */
+  --line:   #E4E7ED;    /* hairline borders          */
+  --line-2: #D3D7E0;    /* stronger borders / control outlines */
+
+  /* ---- host accents (red / green / blue) ---- */
+  --red:      #E4002B;  --red-ink:   #C10024;  --red-soft:   #FDEAEE;
+  --blue:     #0A3D91;  --blue-ink:  #0A3D91;  --blue-soft:  #E7EDF7;
+  --green:    #008A52;  --green-ink: #007444;  --green-soft: #E2F2EB;
+
+  /* ---- gold (trophy / winner / payout ONLY — never general UI) ---- */
+  --gold:      #C8A24B; --gold-ink:  #8A6D1E;  --gold-soft:  #F8F1DE; --gold-line: #E7D49B;
+
+  /* ---- semantic (prediction result & status) ---- */
+  --good: #007444;  /* exact scoreline (green)       */
+  --bad:  #C10024;  /* wrong (red)                   */
+  --warn: #9A6B00;  /* correct outcome only (amber)  */
+
+  /* ---- BRAND layer (themeable) ----
+     Default = host blue. In knockout these are OVERWRITTEN at runtime
+     by an inline style on the app-root wrapper (see computeBrand in
+     lib/theme.ts). Never read a raw flag color directly — read these. */
+  --brand:      var(--blue);
+  --brand-ink:  #0A3D91;   /* brand as TEXT on surface (AA-safe)        */
+  --brand-on:   #FFFFFF;   /* text/icon sitting ON a --brand fill       */
+  --brand-soft: var(--blue-soft);
+  --brand-2:    var(--red);
+  --brand-2-ink: var(--red-ink);
+
+  /* ---- radii ---- */
+  --r-xs: 8px; --r-sm: 12px; --r-md: 16px; --r-lg: 22px; --r-xl: 28px; --r-pill: 999px;
+
+  /* ---- shadows ---- */
+  --shadow-sm: 0 1px 2px rgba(20,21,26,.06), 0 1px 3px rgba(20,21,26,.05);
+  --shadow-md: 0 4px 14px rgba(20,21,26,.07), 0 2px 5px rgba(20,21,26,.05);
+  --shadow-lg: 0 14px 40px rgba(20,21,26,.12), 0 4px 12px rgba(20,21,26,.07);
+  --shadow-gold: 0 8px 26px rgba(200,162,75,.30);
+
+  /* ---- spacing scale (matches Tailwind's default 4px step: 1=4 … 10=40) ---- */
+  --s1: 4px; --s2: 8px; --s3: 12px; --s4: 16px; --s5: 20px; --s6: 24px; --s7: 32px; --s8: 40px;
+
+  /* ---- tap target (HARD FLOOR — every control ≥ 44×44) ---- */
+  --tap: 44px;
+}
+
+/* ------------------------------------------------------------
+   DARK BASE — only the neutral + soft + shadow values flip.
+   Accents/gold/semantic hold; brand still recomputed at runtime.
+------------------------------------------------------------ */
+[data-base="dark"] {
+  --paper:   #0E0F13;
+  --paper-2: #16181F;
+  --paper-3: #1E212B;
+  --surface: #16181F;
+  --stage:   #0A0B0E;
+  --ink:   #F4F5F7;
+  --ink-2: #A7ADBC;
+  --ink-3: #71768A;
+  --line:   #262A35;
+  --line-2: #333845;
+
+  --red-soft:   #2A1217;
+  --blue-soft:  #111B30;
+  --green-soft: #0E2018;
+  --gold-soft:  #241E10;
+
+  --shadow-sm: 0 1px 2px rgba(0,0,0,.40), 0 1px 3px rgba(0,0,0,.40);
+  --shadow-md: 0 4px 14px rgba(0,0,0,.45), 0 2px 5px rgba(0,0,0,.40);
+  --shadow-lg: 0 14px 40px rgba(0,0,0,.55), 0 4px 12px rgba(0,0,0,.45);
+}
+
+/* ------------------------------------------------------------
+   PER-USER FLAG THEMES (knockout)
+   These four are the VERIFIED reference values for the demo
+   personas. In production DO NOT hand-author these blocks —
+   call computeBrand(theme_primary_hex, theme_secondary_hex, base)
+   from lib/theme.ts and set the result as an inline style on the
+   app-root wrapper:  <div data-base={base} style={brandVars}>.
+   They are kept here only as a worked, AA-verified example.
+------------------------------------------------------------ */
+[data-flag="ar"] { --brand:#6CA6DC; --brand-ink:#1E6FB8; --brand-on:#0A2A44; --brand-soft:#E9F2FA; --brand-2:#F2B33D; --brand-2-ink:#92670A; } /* Argentina — pale flag darkened for text */
+[data-flag="de"] { --brand:#1A1A1A; --brand-ink:#1A1A1A; --brand-on:#FFFFFF; --brand-soft:#ECECEE; --brand-2:#D80027; --brand-2-ink:#C10024; } /* Germany — near-black */
+[data-flag="mx"] { --brand:#006847; --brand-ink:#00643F; --brand-on:#FFFFFF; --brand-soft:#E1F0E9; --brand-2:#CE1126; --brand-2-ink:#BC1020; } /* Mexico  — high-contrast */
+[data-flag="br"] { --brand:#009C3B; --brand-ink:#007E30; --brand-on:#FFFFFF; --brand-soft:#E2F4E8; --brand-2:#1C3FAA; --brand-2-ink:#1C3FAA; } /* Brazil  — green + blue 2nd */
+
+/* ------------------------------------------------------------
+   @theme inline — surface the tokens above as Tailwind utilities.
+   `inline` means utilities resolve to var(--token) at runtime, so
+   dark-mode and per-user brand overrides flow through automatically.
+   Resulting utilities (non-exhaustive):
+     bg-paper / bg-paper-2 / bg-surface / bg-stage
+     text-ink / text-ink-2 / text-ink-3
+     border-line / border-line-2
+     bg-red / text-red-ink / bg-red-soft  (and blue/green/gold)
+     bg-brand / text-brand-ink / text-brand-on / bg-brand-soft
+     text-good / text-bad / text-warn
+     rounded-xs … rounded-xl / rounded-pill
+     shadow-sm / shadow-md / shadow-lg / shadow-gold
+     font-body / font-display / font-num
+------------------------------------------------------------ */
+@theme inline {
+  --font-body:    var(--font-body);
+  --font-display: var(--font-display);
+  --font-num:     var(--font-num);
+
+  --color-paper:   var(--paper);
+  --color-paper-2: var(--paper-2);
+  --color-paper-3: var(--paper-3);
+  --color-surface: var(--surface);
+  --color-stage:   var(--stage);
+  --color-ink:   var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-ink-3: var(--ink-3);
+  --color-line:   var(--line);
+  --color-line-2: var(--line-2);
+
+  --color-red:   var(--red);   --color-red-ink:   var(--red-ink);   --color-red-soft:   var(--red-soft);
+  --color-blue:  var(--blue);  --color-blue-ink:  var(--blue-ink);  --color-blue-soft:  var(--blue-soft);
+  --color-green: var(--green); --color-green-ink: var(--green-ink); --color-green-soft: var(--green-soft);
+  --color-gold:  var(--gold);  --color-gold-ink:  var(--gold-ink);  --color-gold-soft:  var(--gold-soft); --color-gold-line: var(--gold-line);
+
+  --color-good: var(--good);
+  --color-bad:  var(--bad);
+  --color-warn: var(--warn);
+
+  --color-brand:      var(--brand);
+  --color-brand-ink:  var(--brand-ink);
+  --color-brand-on:   var(--brand-on);
+  --color-brand-soft: var(--brand-soft);
+  --color-brand-2:     var(--brand-2);
+  --color-brand-2-ink: var(--brand-2-ink);
+
+  --radius-xs: var(--r-xs);
+  --radius-sm: var(--r-sm);
+  --radius-md: var(--r-md);
+  --radius-lg: var(--r-lg);
+  --radius-xl: var(--r-xl);
+  --radius-pill: var(--r-pill);
+
+  --shadow-sm: var(--shadow-sm);
+  --shadow-md: var(--shadow-md);
+  --shadow-lg: var(--shadow-lg);
+  --shadow-gold: var(--shadow-gold);
+}
+
+/* ------------------------------------------------------------
+   BASE LAYER
+------------------------------------------------------------ */
+@layer base {
+  html, body { margin: 0; }
+  body {
+    font-family: var(--font-body);
+    background: var(--stage);   /* canvas behind the app */
+    color: var(--ink);
+    -webkit-font-smoothing: antialiased;
+    line-height: 1.5;
+  }
+  /* All numerals are tabular by default where the num font is used */
+  .tabular { font-variant-numeric: tabular-nums; }
+  /* Scroll bodies: fixed-height children (podiums, cards) never get squeezed */
+  .wc-scroll > * { flex-shrink: 0; }
+}
+
+/* @font-face fallback ONLY for non-Next usage. Prefer next/font (see app/fonts.ts). */
+/*
+@font-face { font-family:"Hanken Grotesk"; src:url(/fonts/HankenGrotesk-Variable.woff2) format("woff2"); font-weight:400 800; font-display:swap; }
+@font-face { font-family:"Saira Condensed"; src:url(/fonts/SairaCondensed-SemiBold.woff2) format("woff2"); font-weight:600; font-display:swap; }
+@font-face { font-family:"Saira Condensed"; src:url(/fonts/SairaCondensed-Bold.woff2) format("woff2"); font-weight:700; font-display:swap; }
+@font-face { font-family:"Saira"; src:url(/fonts/Saira-Variable.woff2) format("woff2"); font-weight:500 700; font-display:swap; }
+*/

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { setUserDraft, lockDraft } from "@/app/admin/draft/actions";
+import { setUserDraft, lockDraft, unlockDraft } from "@/app/admin/draft/actions";
 
 interface Team {
   id: string;
@@ -29,6 +29,8 @@ export function DraftManager({
   const [messages, setMessages] = useState<Record<string, string>>({});
   const [locking, setLocking] = useState(false);
   const [lockError, setLockError] = useState<string>();
+  const [unlocking, setUnlocking] = useState(false);
+  const [unlockError, setUnlockError] = useState<string>();
 
   // Local selections: profileId → [teamId, teamId, teamId]
   const [selections, setSelections] = useState<Record<string, string[]>>(
@@ -86,6 +88,14 @@ export function DraftManager({
     if (result.error) setLockError(result.error);
   }
 
+  async function handleUnlock() {
+    if (!confirm("Unlock the draft? Players will not be able to change picks — only admins can modify assignments.")) return;
+    setUnlocking(true);
+    const result = await unlockDraft();
+    setUnlocking(false);
+    if (result.error) setUnlockError(result.error);
+  }
+
   const totalAssigned = Object.values(selections).flat().filter(Boolean).length;
   const allAssigned = players.every(
     (p) => (selections[p.id] ?? []).filter(Boolean).length === 3
@@ -101,19 +111,27 @@ export function DraftManager({
   if (draftLocked) {
     return (
       <div className="space-y-3">
-        <div className="rounded-xl bg-accent-green/10 border border-accent-green/30 text-accent-green px-4 py-3 text-sm font-medium">
-          🔒 Draft is locked — picks are final.
+        <div className="rounded-xl bg-accent-green/10 border border-accent-green/30 px-4 py-3 flex items-center justify-between gap-3">
+          <span className="text-sm font-medium text-accent-green">🔒 Draft is locked — picks are final.</span>
+          <button
+            onClick={handleUnlock}
+            disabled={unlocking}
+            className="shrink-0 rounded-lg bg-paper-2 border border-line text-ink text-xs font-semibold px-3 py-2 min-h-tap disabled:opacity-50"
+          >
+            {unlocking ? "Unlocking…" : "Unlock (Admin)"}
+          </button>
         </div>
+        {unlockError && <p className="text-xs text-accent-red">{unlockError}</p>}
         {players.map((p) => (
-          <div key={p.id} className="rounded-xl bg-ink-soft border border-paper/10 p-4">
+          <div key={p.id} className="rounded-xl bg-paper-2 border border-line p-4">
             <p className="text-sm font-semibold mb-2">{p.display_name}</p>
             {p.picks.length === 0 ? (
-              <p className="text-xs text-paper/40">No teams assigned</p>
+              <p className="text-xs text-ink-3">No teams assigned</p>
             ) : (
               <div className="space-y-1">
                 {p.picks.map((t) => (
                   <div key={t.id} className="flex items-center gap-2 text-sm">
-                    <span className="text-xs font-mono text-paper/40 w-8">{t.fifa_code}</span>
+                    <span className="text-xs font-mono text-ink-3 w-8">{t.fifa_code}</span>
                     <span>{t.name}</span>
                   </div>
                 ))}
@@ -128,13 +146,13 @@ export function DraftManager({
   return (
     <div className="space-y-4">
       {/* Progress + lock */}
-      <div className="rounded-xl bg-ink-soft border border-paper/10 p-4 flex items-center justify-between gap-4">
+      <div className="rounded-xl bg-paper-2 border border-line p-4 flex items-center justify-between gap-4">
         <div>
           <p className="text-sm font-medium">
             {totalAssigned} / {players.length * 3} teams assigned
           </p>
           {!allAssigned && (
-            <p className="text-xs text-paper/40">
+            <p className="text-xs text-ink-3">
               Each player needs exactly 3 teams
             </p>
           )}
@@ -142,7 +160,7 @@ export function DraftManager({
         <button
           onClick={handleLock}
           disabled={locking || !allAssigned}
-          className="rounded-lg bg-accent-red text-paper text-sm font-semibold px-4 py-2 min-h-tap disabled:opacity-40"
+          className="rounded-lg bg-accent-red text-ink text-sm font-semibold px-4 py-2 min-h-tap disabled:opacity-40"
         >
           {locking ? "Locking…" : "🔒 Lock draft"}
         </button>
@@ -158,7 +176,7 @@ export function DraftManager({
         return (
           <div
             key={player.id}
-            className="rounded-xl bg-ink-soft border border-paper/10 p-4 space-y-3"
+            className="rounded-xl bg-paper-2 border border-line p-4 space-y-3"
           >
             <div className="flex items-center justify-between">
               <p className="text-sm font-semibold">{player.display_name}</p>
@@ -190,13 +208,13 @@ export function DraftManager({
                 const selectedId = playerSelections[slot] ?? "";
                 return (
                   <div key={slot} className="flex items-center gap-2">
-                    <span className="text-xs text-paper/40 w-5 text-center">
+                    <span className="text-xs text-ink-3 w-5 text-center">
                       {slot + 1}
                     </span>
                     <select
                       value={selectedId}
                       onChange={(e) => setSlot(player.id, slot, e.target.value)}
-                      className="flex-1 rounded-lg bg-ink border border-paper/20 px-3 py-2 text-sm text-paper focus:outline-none focus:ring-1 focus:ring-gold min-h-tap"
+                      className="flex-1 rounded-lg bg-paper-2 border border-line-2 px-3 py-2 text-sm text-ink focus:outline-none focus:ring-1 focus:ring-brand min-h-tap"
                     >
                       <option value="">— select team —</option>
                       {Object.keys(teamsByGroup)
@@ -223,7 +241,7 @@ export function DraftManager({
                     {selectedId && (
                       <button
                         onClick={() => removeSlot(player.id, slot)}
-                        className="text-paper/30 hover:text-accent-red text-lg leading-none px-1"
+                        className="text-ink-3 hover:text-accent-red text-lg leading-none px-1"
                         aria-label="Remove"
                       >
                         ×

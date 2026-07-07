@@ -36,7 +36,7 @@ export function DeadlineStatus({
 
   if (locked) {
     return (
-      <div className="flex items-center gap-2 bg-accent-red/10 border border-accent-red/30 text-accent-red rounded-xl px-4 py-3 text-sm font-medium">
+      <div className="flex items-center gap-2 bg-red-soft border border-red-ink/30 text-red-ink rounded-xl px-4 py-3 text-sm font-medium">
         <span>🔒</span>
         <span>Predictions are locked — the deadline has passed.</span>
       </div>
@@ -44,16 +44,16 @@ export function DeadlineStatus({
   }
 
   return (
-    <div className="flex items-center justify-between bg-gold/10 border border-gold/30 rounded-xl px-4 py-3">
+    <div className="flex items-center justify-between bg-gold-soft border border-gold-line rounded-xl px-4 py-3">
       <div>
-        <p className="text-xs text-paper/60 uppercase tracking-wide">Predictions close in</p>
-        <p className="text-lg font-bold text-gold tabular-nums">
+        <p className="text-xs text-ink-3 uppercase tracking-wide">Predictions close in</p>
+        <p className="font-num text-lg font-bold text-gold-ink tabular-nums">
           {timeLeft !== null ? formatCountdown(timeLeft) : "…"}
         </p>
       </div>
       <div className="text-right">
-        <p className="text-xs text-paper/60">Deadline</p>
-        <p className="text-xs text-paper/80">
+        <p className="text-xs text-ink-3">Deadline</p>
+        <p className="text-xs text-ink">
           {new Date(deadline).toLocaleString(undefined, {
             month: "short",
             day: "numeric",

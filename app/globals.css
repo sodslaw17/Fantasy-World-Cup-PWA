@@ -97,7 +97,7 @@
      --logo-opacity : lower than flag; crests are emblems not full-bleed fills.
      --logo-blur    : slight softening only — enough to feel ambient, not decorative. */
   --logo-opacity: 0.18;
-  --logo-blur:    4px;
+  --logo-blur:    1px;
 }
 
 /* ------------------------------------------------------------

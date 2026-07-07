@@ -40,7 +40,7 @@ export function ImportPanel() {
   return (
     <div className="space-y-4">
       {/* Tabs */}
-      <div className="flex gap-1 bg-ink-soft rounded-lg p-1 w-fit">
+      <div className="flex gap-1 bg-paper-2 rounded-lg p-1 w-fit">
         {(["teams", "fixtures"] as Tab[]).map((t) => (
           <button
             key={t}
@@ -48,7 +48,7 @@ export function ImportPanel() {
             className={`px-4 py-2 rounded-md text-sm font-medium transition-colors capitalize ${
               tab === t
                 ? "bg-gold text-ink"
-                : "text-paper/60 hover:text-paper"
+                : "text-ink-2 hover:text-ink"
             }`}
           >
             {t}
@@ -57,11 +57,11 @@ export function ImportPanel() {
       </div>
 
       {/* Format reminder */}
-      <div className="text-xs text-paper/50 space-y-1">
+      <div className="text-xs text-ink-2 space-y-1">
         {tab === "teams" ? (
-          <p>Required columns: <code className="text-paper/70">fifa_code, name, group_letter</code> — optional: <code className="text-paper/70">flag_url</code></p>
+          <p>Required columns: <code className="text-ink">fifa_code, name, group_letter</code> — optional: <code className="text-ink">flag_url</code></p>
         ) : (
-          <p>Required columns: <code className="text-paper/70">group_letter, home_team_code, away_team_code, kickoff_utc</code> (ISO-8601 UTC) — import teams first.</p>
+          <p>Required columns: <code className="text-ink">group_letter, home_team_code, away_team_code, kickoff_utc</code> (ISO-8601 UTC) — import teams first.</p>
         )}
       </div>
 
@@ -71,7 +71,7 @@ export function ImportPanel() {
         onChange={(e) => { setCsv(e.target.value); setState({ loading: false }); }}
         placeholder={`Paste ${tab} CSV here…`}
         rows={12}
-        className="w-full rounded-lg bg-ink border border-paper/20 px-3 py-2.5 text-sm text-paper placeholder:text-paper/30 font-mono focus:outline-none focus:ring-1 focus:ring-gold resize-y"
+        className="w-full rounded-lg bg-paper-2 border border-line-2 px-3 py-2.5 text-sm text-ink placeholder:text-ink-3 font-mono focus:outline-none focus:ring-1 focus:ring-brand resize-y"
       />
 
       <div className="flex gap-3 flex-wrap">
@@ -84,7 +84,7 @@ export function ImportPanel() {
         </button>
         <button
           onClick={loadExample}
-          className="rounded-lg border border-paper/20 text-paper/60 text-sm px-4 py-2.5 min-h-tap hover:text-paper hover:border-paper/40"
+          className="rounded-lg border border-line-2 text-ink-2 text-sm px-4 py-2.5 min-h-tap hover:text-ink hover:border-line-2"
         >
           Load example
         </button>

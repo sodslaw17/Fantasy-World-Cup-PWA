@@ -50,8 +50,8 @@ export function FlagBackdrop({ darkUrl, lightUrl, base }: Props) {
           role="presentation"
           className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 transition-opacity duration-500"
           style={{
-            width: "70vmin",
-            height: "70vmin",
+            width: "77vmin",
+            height: "77vmin",
             objectFit: "contain",
             opacity: "var(--logo-opacity)",
             filter: "blur(var(--logo-blur))",

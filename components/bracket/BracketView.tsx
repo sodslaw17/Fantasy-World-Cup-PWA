@@ -30,8 +30,8 @@ export function BracketView({
     return (
       <div className="flex flex-col items-center justify-center py-16 gap-3 text-center px-4">
         <span className="text-4xl">🗂</span>
-        <p className="text-paper/60 text-sm">Bracket not yet available.</p>
-        <p className="text-paper/30 text-xs">
+        <p className="text-ink-2 text-sm">Bracket not yet available.</p>
+        <p className="text-ink-3 text-xs">
           Admin will add knockout matches once the group stage is complete.
         </p>
       </div>
@@ -45,7 +45,7 @@ export function BracketView({
         {availableStages.map((s) => (
           <button key={s} onClick={() => onStageSelect(s)}
             className={`shrink-0 px-3 py-2 rounded-lg text-xs font-semibold transition-colors ${
-              selectedStage === s ? "bg-gold text-ink" : "bg-ink-soft text-paper/60 hover:text-paper"
+              selectedStage === s ? "bg-brand text-brand-on" : "bg-paper-2 text-ink-2 hover:text-ink"
             }`}>
             {STAGE_LABELS[s]}
           </button>
@@ -55,7 +55,7 @@ export function BracketView({
       {/* Matches */}
       <div className="space-y-3">
         {matches.length === 0 ? (
-          <p className="text-sm text-paper/40 text-center py-8">No matches for this round yet.</p>
+          <p className="text-sm text-ink-3 text-center py-8">No matches for this round yet.</p>
         ) : (
           matches
             .sort((a, b) => new Date(a.kickoff_utc).getTime() - new Date(b.kickoff_utc).getTime())
@@ -80,12 +80,12 @@ function BracketMatchCard({ match }: { match: BracketMatch }) {
   const awayWon = finished && !homeWon;
 
   return (
-    <div className="rounded-xl bg-ink-soft border border-paper/10 overflow-hidden">
+    <div className="rounded-xl bg-surface border border-line overflow-hidden shadow-sm">
       {/* Match meta */}
       <div className="px-4 pt-3 pb-1 flex items-center justify-between">
-        <span className="text-xs text-paper/40">{kickoffStr}</span>
-        {live && <span className="text-xs text-accent-green font-semibold animate-pulse">● LIVE</span>}
-        {finished && <span className="text-xs text-paper/40">Full time</span>}
+        <span className="text-xs text-ink-3">{kickoffStr}</span>
+        {live && <span className="text-xs text-green-ink font-semibold animate-pulse">● LIVE</span>}
+        {finished && <span className="text-xs text-ink-3">Full time</span>}
       </div>
 
       {/* Teams */}
@@ -105,7 +105,7 @@ function BracketMatchCard({ match }: { match: BracketMatch }) {
           won={awayWon}
         />
         {match.went_to_shootout && finished && (
-          <p className="text-xs text-paper/40 text-center">
+          <p className="text-xs text-ink-3 text-center">
             ({match.shootout_winner === "home" ? match.homeTeamName : match.awayTeamName} won on penalties)
           </p>
         )}
@@ -128,7 +128,7 @@ function TeamRow({
   won: boolean;
 }) {
   return (
-    <div className={`flex items-center gap-2 rounded-lg px-2 py-1.5 ${won ? "bg-gold/10" : ""}`}>
+    <div className={`flex items-center gap-2 rounded-lg px-2 py-1.5 ${won ? "bg-gold-soft" : ""}`}>
       {/* User avatar (if drafted) */}
       {owner ? (
         <Avatar name={owner.name} url={owner.avatarUrl} size="xs" />
@@ -137,20 +137,20 @@ function TeamRow({
       )}
 
       {/* Team code */}
-      <span className="text-xs font-mono text-paper/40 w-7 shrink-0">{code ?? "TBD"}</span>
+      <span className="text-xs font-mono text-ink-3 w-7 shrink-0">{code ?? "TBD"}</span>
 
       {/* Team name */}
-      <span className={`flex-1 text-sm font-medium truncate ${won ? "text-gold" : "text-paper"}`}>
+      <span className={`flex-1 text-sm font-medium truncate ${won ? "text-gold-ink font-bold" : "text-ink"}`}>
         {name}
       </span>
 
       {/* Owner name */}
       {owner && (
-        <span className="text-xs text-paper/40 shrink-0 hidden sm:block">{owner.name}</span>
+        <span className="text-xs text-ink-3 shrink-0 hidden sm:block">{owner.name}</span>
       )}
 
       {/* Goals */}
-      <span className={`text-lg font-black tabular-nums w-6 text-right shrink-0 ${won ? "text-gold" : "text-paper"}`}>
+      <span className={`font-num text-lg font-black tabular-nums w-6 text-right shrink-0 ${won ? "text-gold-ink" : "text-ink"}`}>
         {goals !== null && goals !== undefined ? goals : "–"}
       </span>
     </div>

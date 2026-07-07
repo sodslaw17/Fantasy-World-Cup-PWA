@@ -14,21 +14,105 @@ export async function saveEfficiencyPick(
   const playerName    = (formData.get("player_name") as string)?.trim();
   const teamCode      = (formData.get("team_code") as string)?.trim().toUpperCase() || null;
   const playerPhotoUrl = (formData.get("player_photo_url") as string)?.trim() || null;
-  const goals         = parseInt(formData.get("goals") as string) || 0;
-  const assists       = parseInt(formData.get("assists") as string) || 0;
-  const minutes       = parseInt(formData.get("minutes") as string) || 0;
 
   if (!playerName) return { error: "Player name required." };
 
   const service = createServiceClient();
   const { error } = await service.from("efficiency_picks").upsert(
-    { profile_id: profileId, player_name: playerName, team_code: teamCode, player_photo_url: playerPhotoUrl, goals, assists, minutes },
+    {
+      profile_id: profileId, player_name: playerName, team_code: teamCode,
+      player_photo_url: playerPhotoUrl,
+    },
     { onConflict: "profile_id" }
   );
 
   if (error) return { error: error.message };
   revalidatePath("/admin/sidepots");
   revalidatePath("/payouts");
+  revalidatePath("/");
+  return { success: true };
+}
+
+// ── Efficiency per-game stats (migration 016) ────────────────────────────────
+// One row per (pick, match). goals/assists/minutes here are always the
+// admin-entered value for that single game; efficiency_picks.goals/assists/
+// minutes is kept as their SUM by a DB trigger, so the scoring/leaderboard
+// code is untouched.
+
+/**
+ * Bulk-saves every game row for one pick's table in a single call (so the
+ * admin fills in the whole table, then hits one "Save" button).
+ * `matchId: null` addresses the single migrated "prior total" bucket row.
+ */
+export async function saveEfficiencyMatchStats(
+  pickId: string,
+  rows: Array<{ matchId: string | null; goals: number; assists: number; minutes: number }>
+): Promise<ActionResult> {
+  const service = createServiceClient();
+
+  const gameRows  = rows.filter((r) => r.matchId !== null);
+  const priorTotal = rows.find((r) => r.matchId === null) ?? null;
+
+  if (gameRows.length > 0) {
+    const { error } = await service.from("efficiency_match_stats").upsert(
+      gameRows.map((r) => ({
+        efficiency_pick_id: pickId,
+        match_id: r.matchId,
+        is_prior_total: false,
+        goals: r.goals, assists: r.assists, minutes: r.minutes,
+      })),
+      { onConflict: "efficiency_pick_id,match_id" }
+    );
+    if (error) return { error: error.message };
+  }
+
+  if (priorTotal) {
+    const { data: existing } = await service
+      .from("efficiency_match_stats")
+      .select("id")
+      .eq("efficiency_pick_id", pickId)
+      .is("match_id", null)
+      .maybeSingle();
+
+    const { error } = existing
+      ? await service.from("efficiency_match_stats")
+          .update({ goals: priorTotal.goals, assists: priorTotal.assists, minutes: priorTotal.minutes })
+          .eq("id", existing.id)
+      : await service.from("efficiency_match_stats").insert({
+          efficiency_pick_id: pickId, match_id: null, is_prior_total: true,
+          goals: priorTotal.goals, assists: priorTotal.assists, minutes: priorTotal.minutes,
+        });
+    if (error) return { error: error.message };
+  }
+
+  revalidatePath("/admin/sidepots");
+  revalidatePath("/payouts");
+  revalidatePath("/");
+  return { success: true };
+}
+
+export async function deleteEfficiencyMatchStat(id: string): Promise<ActionResult> {
+  const service = createServiceClient();
+  const { error } = await service.from("efficiency_match_stats").delete().eq("id", id);
+  if (error) return { error: error.message };
+  revalidatePath("/admin/sidepots");
+  revalidatePath("/payouts");
+  revalidatePath("/");
+  return { success: true };
+}
+
+export async function updateEfficiencyPhoto(
+  profileId: string,
+  photoUrl: string | null
+): Promise<ActionResult> {
+  const service = createServiceClient();
+  const { error } = await service
+    .from("efficiency_picks")
+    .update({ player_photo_url: photoUrl })
+    .eq("profile_id", profileId);
+  if (error) return { error: error.message };
+  revalidatePath("/admin/sidepots");
+  revalidatePath("/");
   return { success: true };
 }
 
@@ -45,7 +129,12 @@ export async function saveMatchCards(
 
   const service = createServiceClient();
   const { error } = await service.from("match_stats").upsert(
-    { match_id: matchId, team_code: teamCode, yellows, second_yellows: secondYellows, straight_reds: straightReds },
+    {
+      match_id: matchId, team_code: teamCode,
+      yellows, yellows_manual: yellows,
+      second_yellows: secondYellows, second_yellows_manual: secondYellows,
+      straight_reds: straightReds, straight_reds_manual: straightReds,
+    },
     { onConflict: "match_id,team_code" }
   );
 
