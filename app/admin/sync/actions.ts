@@ -3,16 +3,22 @@
 import { revalidatePath } from "next/cache";
 import { createServiceClient } from "@/lib/supabase/service";
 import { runSync } from "@/lib/sync/engine";
+import { runEspnSync } from "@/lib/sync/espn-engine";
 import { searchTeams, searchPlayers } from "@/lib/api-football/client";
+import { getTeams as getEspnTeams } from "@/lib/espn/client";
 
 interface ActionResult { success?: boolean; error?: string; }
 
 // ── ID Mapping ───────────────────────────────────────────────────────────────
+// Shared by both sync sources — api_id_mappings is keyed on
+// (resource_type, internal_id, provider), so the same team/match can carry an
+// api-football mapping and an espn mapping side by side without conflict.
 
 export async function setMapping(
   resourceType: "team" | "player",
   internalId: string,
-  apiId: string
+  apiId: string,
+  provider: "api-football" | "espn" = "api-football"
 ): Promise<ActionResult> {
   if (!apiId.trim()) return { error: "API ID is required." };
   const service = createServiceClient();
@@ -20,7 +26,7 @@ export async function setMapping(
     {
       resource_type: resourceType,
       internal_id: internalId,
-      provider: "api-football",
+      provider,
       api_id: apiId.trim(),
       verified: true,
     },
@@ -44,6 +50,16 @@ export async function removeMapping(id: string): Promise<ActionResult> {
 export async function triggerManualSync(): Promise<{ error?: string; result?: Awaited<ReturnType<typeof runSync>> }> {
   try {
     const result = await runSync("manual", true);
+    revalidatePath("/admin/sync");
+    return { result };
+  } catch (e) {
+    return { error: String(e) };
+  }
+}
+
+export async function triggerManualEspnSync(): Promise<{ error?: string; result?: Awaited<ReturnType<typeof runEspnSync>> }> {
+  try {
+    const result = await runEspnSync("manual", true);
     revalidatePath("/admin/sync");
     return { result };
   } catch (e) {
@@ -124,6 +140,25 @@ export async function apiSearchPlayers(name: string): Promise<{
   try {
     const resp = await searchPlayers(name.trim());
     return { players: (resp.response ?? []).map((p) => ({ id: p.player.id, name: p.player.name })) };
+  } catch (e) {
+    return { error: String(e) };
+  }
+}
+
+/** ESPN has no search endpoint — lists all tournament teams for the admin to filter. */
+export async function espnSearchTeams(name: string): Promise<{
+  teams?: Array<{ id: string; name: string }>;
+  error?: string;
+}> {
+  try {
+    const resp = await getEspnTeams();
+    const all = (resp.sports?.[0]?.leagues?.[0]?.teams ?? []).map((t) => ({
+      id: t.team.id,
+      name: t.team.displayName,
+    }));
+    if (!name.trim()) return { teams: all };
+    const q = name.trim().toLowerCase();
+    return { teams: all.filter((t) => t.name.toLowerCase().includes(q)) };
   } catch (e) {
     return { error: String(e) };
   }

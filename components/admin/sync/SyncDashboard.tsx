@@ -5,6 +5,7 @@ import {
   setMapping, removeMapping, triggerManualSync,
   apiSearchTeams, apiSearchPlayers,
 } from "@/app/admin/sync/actions";
+import { EspnTab, type EspnTeamRow, type EspnLogEntry } from "./EspnTab";
 
 // ── Types passed from server page ────────────────────────────────────────────
 
@@ -50,19 +51,21 @@ interface Props {
   log: SyncLogEntry[];
   inLiveWindow: boolean;
   apiKeyConfigured: boolean;
+  espnTeams: EspnTeamRow[];
+  espnLog: EspnLogEntry[];
 }
 
-type Tab = "status" | "teams" | "players";
+type Tab = "status" | "teams" | "players" | "espn";
 
 // ── Main component ────────────────────────────────────────────────────────────
 
-export function SyncDashboard({ teams, players, log, inLiveWindow, apiKeyConfigured }: Props) {
+export function SyncDashboard({ teams, players, log, inLiveWindow, apiKeyConfigured, espnTeams, espnLog }: Props) {
   const [tab, setTab] = useState<Tab>("status");
 
   return (
     <div>
       <div className="flex gap-1 border-b border-line mb-6 px-1">
-        {(["status", "teams", "players"] as Tab[]).map((t) => (
+        {(["status", "teams", "players", "espn"] as Tab[]).map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}
@@ -72,6 +75,7 @@ export function SyncDashboard({ teams, players, log, inLiveWindow, apiKeyConfigu
           >
             {t === "teams" ? `Teams (${teams.filter(r => r.apiId).length}/${teams.length})` :
              t === "players" ? `Players (${players.filter(r => r.apiId).length}/${players.length})` :
+             t === "espn" ? `ESPN (${espnTeams.filter(r => r.espnId).length}/${espnTeams.length})` :
              "Status"}
           </button>
         ))}
@@ -80,6 +84,7 @@ export function SyncDashboard({ teams, players, log, inLiveWindow, apiKeyConfigu
       {tab === "status"  && <StatusTab log={log} inLiveWindow={inLiveWindow} apiKeyConfigured={apiKeyConfigured} />}
       {tab === "teams"   && <TeamsTab teams={teams} />}
       {tab === "players" && <PlayersTab players={players} />}
+      {tab === "espn"    && <EspnTab teams={espnTeams} log={espnLog} />}
     </div>
   );
 }

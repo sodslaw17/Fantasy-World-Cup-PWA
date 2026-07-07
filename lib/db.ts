@@ -160,6 +160,7 @@ export interface SyncLog {
   started_at: string;
   finished_at: string | null;
   trigger: "cron" | "manual";
+  source: "api-football" | "espn";
   in_live_window: boolean;
   skipped: boolean;
   matches_checked: number;
